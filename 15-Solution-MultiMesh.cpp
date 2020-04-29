@@ -91,8 +91,8 @@ const char *pixelShader = R"(
         float d = abs(dot(N, L));          // two-sided diffuse
         float s = abs(dot(R, E));          // two-sided specular
         float intensity = clamp(d+pow(s, 50), 0, 1);
-        vec3 color = texture(textureImage, vUv).rgb;
-        pColor = vec4(intensity*color, 1);
+        vec3 color = texture(textureImage, vec2(vUv.x,1-vUv.y)).rgb;
+        pColor = vec4(2*intensity*color, 1);
         //pColor = vec4(vec3(1,0,0), 1);
     }
 )";

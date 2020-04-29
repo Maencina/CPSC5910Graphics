@@ -52,10 +52,10 @@ unsigned char *ReadTarga(const char *filename, int &width, int &height) {
         // allocate, read pixels
         int w = width = tgaHeader[6], h = height = tgaHeader[7];
         int bitsPerPixel = tgaHeader[8], bytesPerPixel = bitsPerPixel/8, bytesPerImage = w*h*bytesPerPixel;
-        if (bytesPerPixel != 3) {
+        /*if (bytesPerPixel != 3) {
             printf("bytes per pixel not 3!\n");
             return NULL;
-        }
+        }*/
         unsigned char *pixels = new unsigned char[bytesPerImage];
         fread(pixels, bytesPerImage, 1, in);
         fclose(in);
