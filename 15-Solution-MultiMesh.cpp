@@ -21,8 +21,8 @@ using namespace std;
 
 // display
 GLuint      shader = 0;
-int         winW = 600, winH = 600;
-// Commented by Mauricio
+int         winW = 1200, winH = 600;
+// Commented by MauriciotextureId
 CameraAB    camera(0, 0, winW, winH, vec3(0,0,0), vec3(0,0,-5));
 
 // interaction
@@ -37,7 +37,7 @@ void       *picked = &camera;
 class Mesh {
 public:
     Mesh();
-    int id;
+    int id,id2, id3, id4, id5, id6, id7, id8, id9, id10, id11;
     string filename;
     // vertices and triangles
     vector<vec3> points;
@@ -47,7 +47,8 @@ public:
     // object to world space
     mat4 xform;
     // GPU vertex buffer and texture
-    GLuint vBufferId, textureId;
+    GLuint vBufferId, textureId, textureId2, textureId3, textureId4, textureId5;
+    GLuint textureId6, textureId7, textureId8, textureId9, textureId10, textureId11;
     // operations
     void Buffer();
     void Draw();
@@ -82,18 +83,95 @@ const char *pixelShader = R"(
     in vec2 vUv;
     out vec4 pColor;
     uniform vec3 light;
-    uniform sampler2D textureImage;
+    uniform sampler2D textureImage_Albedo;
+    uniform sampler2D textureImage_Normal;
+    uniform sampler2D textureImage_19_AO;
+    uniform sampler2D textureImage_19_Metallic;
+    uniform sampler2D textureImage_19_Roughness;
+    uniform sampler2D textureImage_20_AO;
+    uniform sampler2D textureImage_20_Base_Color;
+    uniform sampler2D textureImage_20_Default_Normal;
+    uniform sampler2D textureImage_20_Metallic;
+    uniform sampler2D textureImage_20_Roughness;
+    uniform sampler2D textureImage_internal_AO;
+       
+    uniform mat4 modelview;
+
+    float F_Schlick(float VoH, float f0, float f90) 
+    {
+        return f0 + (f90 - f0) * pow(1.0 - VoH, 5.0);
+    }
+
+    float disneyDiffuse(float NoE, float NoL, float LoH, float f0, float roughness)
+    {
+        float PI = 3.1652;
+        float f90 = 0.5 + 2.0 * roughness * LoH * LoH;
+        float lightScatter = F_Schlick(NoL, 1.0, f90);
+        float viewScatter = F_Schlick(NoE, 1.0, f90);
+        return lightScatter * viewScatter * (1.0 / PI);
+    }
+
     void main() {
+     
+        //Textures Files
+        //Extension 19
+        vec3 Normal = texture(textureImage_Normal, vec2(vUv.x,vUv.y)).rgb;
+        vec3 AOTexture = texture(textureImage_19_AO, vec2(vUv.x,vUv.y)).rgb;
+        vec3 albedo = texture(textureImage_Albedo, vec2(vUv.x,1-vUv.y)).rgb;
+        vec3 metallicTexture = texture(textureImage_19_Metallic, vec2(vUv.x,vUv.y)).rgb;
+        vec3 roughnessTexture = texture(textureImage_19_Roughness, vec2(vUv.x,vUv.y)).rgb;
+        //Extension 20
+        vec3 lespaul_20_AO = texture(textureImage_20_AO, vec2(vUv.x,vUv.y)).rgb;
+        vec3 lespaul_20_Base_Color = texture(textureImage_20_Base_Color, vec2(vUv.x,vUv.y)).rgb;
+        vec3 lespaul_20_Default_Normal = texture(textureImage_20_Default_Normal, vec2(vUv.x,vUv.y)).rgb;
+        vec3 lespaul_20_Metallic = texture(textureImage_20_Metallic, vec2(vUv.x,vUv.y)).rgb;
+        vec3 lespaul_20_Roughness = texture(textureImage_20_Roughness, vec2(vUv.x,vUv.y)).rgb;
+        vec3 lespaul_internal_AO = texture(textureImage_internal_AO, vec2(vUv.x,vUv.y)).rgb;
+        
+        //Constants
+        float PI = 3.1415;
+    
+        //Information from the Vertex Shader
         vec3 N = normalize(vNormal);       // surface normal
         vec3 L = normalize(light-vPoint);  // light vector
         vec3 E = normalize(vPoint);        // eye vector
-        vec3 R = reflect(L, N);            // highlight vector
-        float d = abs(dot(N, L));          // two-sided diffuse
-        float s = abs(dot(R, E));          // two-sided specular
-        float intensity = clamp(d+pow(s, 50), 0, 1);
-        vec3 color = texture(textureImage, vec2(vUv.x,1-vUv.y)).rgb;
-        pColor = vec4(2*intensity*color, 1);
-        //pColor = vec4(vec3(1,0,0), 1);
+        
+
+        //Dots + Half Vector
+        vec3 R = reflect(L, N);
+        vec3 H = normalize(E + L); //Half Vector            
+        float NoL = abs(dot(N, L));          
+        float RoE = abs(dot(R, E));          
+        float NoE = abs(dot(N, E));
+        float LoH = abs(dot(L, H));
+        
+        //f0
+        float reflectance = 0.5;
+        vec3 f0 = 0.16 * reflectance * reflectance * (1.0 - metallicTexture) + albedo * metallicTexture;
+        
+
+        //Diffuse
+        //Lambert
+        float Lambert = 1/PI;
+        //Disney
+        float Disney = disneyDiffuse(NoE, NoL, LoH, f0.r, roughnessTexture.r);
+
+        vec3 diffuse = albedo;
+    
+        //Specular
+        
+        //Jules Code
+        //Light Intensity
+        //float d = NoL;
+        //float s = RoE;
+        //float intensity = clamp(d+pow(s, 50), 0, 1);
+        
+
+        //Light Intensity
+        float intensity = 3.0;
+
+        pColor = vec4(intensity * diffuse, 1);
+
     }
 )";
 
@@ -204,7 +282,19 @@ void AddMesh() {
 
 // Mesh
 
-Mesh::Mesh() { vBufferId = textureId = id = 0; }
+Mesh::Mesh() {
+    vBufferId = textureId = id = 0;
+    textureId2 = id2 = 1;
+    textureId3 = id3 = 2;
+    textureId4 = id4 = 3;
+    textureId5 = id5 = 4;
+    textureId6 = id6 = 5;
+    textureId7 = id7 = 6;
+    textureId8 = id8 = 7;
+    textureId9 = id9 = 8;
+    textureId10 = id10 = 9;
+    textureId11 = id11 = 10;
+}
 
 void Mesh::Buffer() {
     // create a vertex buffer for the mesh
@@ -233,9 +323,55 @@ void Mesh::Draw() {
     VertexAttribPointer(shader, "normal", 3, 0, (void *) sizePoints);
     VertexAttribPointer(shader, "uv", 2, 0, (void *) (sizePoints+sizeNormals));
     // set custom transform (xform = mesh transforms X view transform)
-    glActiveTexture(GL_TEXTURE1+id);    // active texture corresponds with textureUnit
+    glActiveTexture(GL_TEXTURE1+id);
+    // active texture corresponds with textureUnit
     glBindTexture(GL_TEXTURE_2D, textureId);
-    SetUniform(shader, "textureImage", (int) textureId);
+
+    //Normals Map
+    glActiveTexture(GL_TEXTURE1 + id2);
+    glBindTexture(GL_TEXTURE_2D, textureId2);
+
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id3);
+    glBindTexture(GL_TEXTURE_2D, textureId3);
+
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id4);
+    glBindTexture(GL_TEXTURE_2D, textureId4);
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id5);
+    glBindTexture(GL_TEXTURE_2D, textureId5);
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id6);
+    glBindTexture(GL_TEXTURE_2D, textureId6);
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id7);
+    glBindTexture(GL_TEXTURE_2D, textureId7);
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id8);
+    glBindTexture(GL_TEXTURE_2D, textureId8);
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id9);
+    glBindTexture(GL_TEXTURE_2D, textureId9);
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id10);
+    glBindTexture(GL_TEXTURE_2D, textureId10);
+    //AO map
+    glActiveTexture(GL_TEXTURE1 + id11);
+    glBindTexture(GL_TEXTURE_2D, textureId11);
+
+    SetUniform(shader, "textureImage_Albedo", (int)textureId);
+    SetUniform(shader, "textureImage_Normal", (int)textureId2);
+    SetUniform(shader, "textureImage_19_AO", (int)textureId3);
+    SetUniform(shader, "textureImage_19_Metallic", (int)textureId4);
+    SetUniform(shader, "textureImage_19_Roughness", (int)textureId5);
+    SetUniform(shader, "textureImage_20_AO", (int)textureId6);
+    SetUniform(shader, "textureImage_20_Base_Color", (int)textureId7);
+    SetUniform(shader, "textureImage_20_Default_Normal", (int)textureId8);
+    SetUniform(shader, "textureImage_20_Metallic", (int)textureId8);
+    SetUniform(shader, "textureImage_20_Roughness", (int)textureId10);
+    SetUniform(shader, "textureImage_internal_AO", (int)textureId11);
+
     SetUniform(shader, "modelview", camera.modelview*xform);
     SetUniform(shader, "persp", camera.persp);
     glDrawElements(GL_TRIANGLES, 3*triangles.size(), GL_UNSIGNED_INT, &triangles[0]);
@@ -245,7 +381,18 @@ bool Mesh::Read(int mid, char *name, mat4 *m) {
     id = mid;
     filename = string(name);
     string objectFilename = filename+".obj";
-    string textureFilename = filename+".tga";
+    //string objectFilename =  "lespaul_details.obj";
+    string textureFilename = "lespaul_Albedo.tga";
+    string textureFilename2 = "lespaulnormal.tga";
+    string textureFilename3 = "lespaul_19_AO.tga";
+    string textureFilename4 = "lespaul_19_Metallic.tga";
+    string textureFilename5 = "lespaul_19_Roughness.tga";
+    string textureFilename6 = "lespaul_20_AO.tga";
+    string textureFilename7 = "lespaul_20_Base_Color.tga";
+    string textureFilename8 = "lespaul_20_Default_Normal.tga";
+    string textureFilename9 = "lespaul_20_Metallic.tga";
+    string textureFilename10 = "lespaul_20_Roughness.tga";
+    string textureFilename11 = "lespaul_internal_AO.tga";
     if (!ReadAsciiObj((char *) objectFilename.c_str(), points, triangles, &normals, &uvs)) {
         printf("can't read %s\n", objectFilename.c_str());
         return false;
@@ -253,6 +400,16 @@ bool Mesh::Read(int mid, char *name, mat4 *m) {
     Normalize(points, .8f);
     Buffer();
     textureId = LoadTexture((char *) textureFilename.c_str(), id);
+    textureId2 = LoadTexture((char*)textureFilename2.c_str(), id2);
+    textureId3 = LoadTexture((char*)textureFilename3.c_str(), id3);
+    textureId4 = LoadTexture((char*)textureFilename4.c_str(), id4);
+    textureId5 = LoadTexture((char*)textureFilename5.c_str(), id5);
+    textureId6 = LoadTexture((char*)textureFilename6.c_str(), id6);
+    textureId7 = LoadTexture((char*)textureFilename7.c_str(), id7);
+    textureId8 = LoadTexture((char*)textureFilename8.c_str(), id8);
+    textureId9 = LoadTexture((char*)textureFilename9.c_str(), id9);
+    textureId10 = LoadTexture((char*)textureFilename10.c_str(), id10);
+    textureId11 = LoadTexture((char*)textureFilename11.c_str(), id11);
     if (m)
         xform = *m;
     framer.Set(&xform, 100, camera.persp*camera.modelview);
