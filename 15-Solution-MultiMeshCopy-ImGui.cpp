@@ -3,6 +3,7 @@
 
 
 #include <glad.h>
+//#include <GLFW/glfw3.h>
 #include <time.h>
 #include "CameraArcball.h"
 #include "Draw.h"
@@ -10,48 +11,45 @@
 #include "Mesh.h"
 #include "Misc.h"
 #include "Widgets.h"
+#include <stdio.h>
 #include "Draw.h"
 #include "Quaternion.h"
 #include "GL/glut.h"
+//#include <AntTweakBar.h>
 #include "imgui.h"
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-#include <stdio.h>
+// Stuff above works -- testing below
+//#include <imgui_impl_glfw_gl3.h>
+//#include "thread"
+#include <chrono>
 
-// About Desktop OpenGL function loaders:
-//  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
-//  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
-//  You may use another loader/header of your choice (glext, glLoadGen, etc.), or chose to manually implement your own.
-#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-#include <GL/gl3w.h>            // Initialize with gl3wInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-#include <GL/glew.h>            // Initialize with glewInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-#include <glad/glad.h>          // Initialize with gladLoadGL()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/Binding.h>  // Initialize with glbinding::Binding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/glbinding.h>// Initialize with glbinding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#else
-#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-#endif
-
+//// About Desktop OpenGL function loaders:
+////  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
+////  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
+////  You may use another loader/header of your choice (glext, glLoadGen, etc.), or chose to manually implement your own.
+//#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
+//#include <GL/gl3w.h>            // Initialize with gl3wInit()
+//#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+//#include <GL/glew.h>            // Initialize with glewInit()
+//#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
+//#include <glad/glad.h>          // Initialize with gladLoadGL()
+//#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
+//#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
+//#include <glbinding/Binding.h>  // Initialize with glbinding::Binding::initialize()
+//#include <glbinding/gl/gl.h>
+//using namespace gl;
+//#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
+//#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
+//#include <glbinding/glbinding.h>// Initialize with glbinding::initialize()
+//#include <glbinding/gl/gl.h>
+//using namespace gl;
+//#else
+//#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
+//#endif
+#include <GL/gl3w.h> 
 #include <GLFW/glfw3.h>
-// Include glfw3.h after our OpenGL definitions
-//#include <GLFW/glfw3.h>
 
-// [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
-// To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
-// Your own project should not be affected, as you are likely to link with a newer binary of GLFW that is adequate for your version of Visual Studio.
-#if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
-#pragma comment(lib, "legacy_stdio_definitions")
-#endif
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -64,18 +62,20 @@ using namespace std;
 
 // display
 GLuint      shader = 0;
-int         winW = 1600, winH = 600;
+int         winW = 1650, winH = 800;
 CameraAB    camera(0, 0, winW, winH, vec3(0,0,0), vec3(0,0,-5));
 
 // interaction
 int         xCursorOffset = 0, yCursorOffset = 0;
 vec3        light(-.2f, .4f, .3f);
-vec3        light2(-.3f, .3f, .2f);
+vec3        light2(-.3f, .3f, .1f);
+
 Framer      framer;     // to position/orient individual mesh
 Mover       mover;      // to position light
 void       *picked = &camera;
 
 // Mesh Class
+
 class Mesh {
 public:
     Mesh();
@@ -98,7 +98,10 @@ public:
         // read in object file (with normals, uvs) and texture map, initialize matrix, build vertex buffer
 };
 
+SYSTEMTIME getTime;
+
 // Shaders
+
 const char *vertexShader = R"(
     #version 130
     in vec3 point;
@@ -109,8 +112,14 @@ const char *vertexShader = R"(
     out vec2 vUv;
     uniform mat4 modelview;
     uniform mat4 persp;
+    uniform int current_time;
+    uniform bool move_guitar_updown;
     void main() {
         vPoint = (modelview*vec4(point, 1)).xyz;
+        if (move_guitar_updown)
+        {        
+            vPoint.y += 0.5*sin(current_time/3);
+        }
         vNormal = (modelview*vec4(normal, 0)).xyz;
         gl_Position = persp*vec4(vPoint, 1);
         vUv = uv;
@@ -125,19 +134,28 @@ const char *pixelShader = R"(
     out vec4 pColor;
     uniform vec3 light;
     uniform vec3 light2;
-    uniform sampler2D textureImage_Albedo;
-    uniform sampler2D textureImage_Normal;
-    uniform sampler2D textureImage_19_AO;
-    uniform sampler2D textureImage_19_Metallic;
-    uniform sampler2D textureImage_19_Roughness;
-    uniform sampler2D textureImage_20_AO;
+    //uniform vec3 lightDir;
+    uniform sampler2D Albedo_Map;
+    uniform sampler2D Normal_Map;
+    uniform sampler2D AO_Map;
+    uniform sampler2D Metallic_Map;
+    uniform sampler2D Roughness_Map;
+    /*uniform sampler2D textureImage_20_AO;
     uniform sampler2D textureImage_20_Base_Color;
     uniform sampler2D textureImage_20_Default_Normal;
     uniform sampler2D textureImage_20_Metallic;
     uniform sampler2D textureImage_20_Roughness;
-    uniform sampler2D textureImage_internal_AO;
-       
+    uniform sampler2D textureImage_internal_AO;*/
     uniform mat4 modelview;
+
+    // Difusse
+    uniform bool show_lambert_model;
+    uniform bool show_disney_model;
+    uniform bool show_orennayar_model;
+
+    // Specular
+    uniform bool show_blinnphong_model;
+    uniform bool show_cooktorrance_model;
 
     float F_Schlick(float VoH, float f0, float f90) 
     {
@@ -153,22 +171,33 @@ const char *pixelShader = R"(
         return lightScatter * viewScatter * (1.0 / PI);
     }
 
+    vec3 GeometryFunction(float NoV, float NoL, vec3 a) 
+    {
+                vec3 a2 = a * a;
+                vec3 GGXL = NoV * sqrt((-NoL * a2 + NoL) * NoL + a2);
+                vec3 GGXV = NoL * sqrt((-NoV * a2 + NoV) * NoV + a2);
+                return 0.5 / (GGXV + GGXL);
+     }
+
+     vec3 DistributionFunction(float NoH, vec3 a) //D_GGX_Float3
+     {
+                float PI = 3.141592;
+                vec3 a2 = a * a;
+                vec3 f = (NoH * a2 - NoH) * NoH + 1.0;
+                return a2 / (PI * f * f);
+     }
+
+    
+
     void main() {
      
         //Textures Files
         //Extension 19
-        vec3 Normal = texture(textureImage_Normal, vec2(vUv.x,vUv.y)).rgb;
-        vec3 AOTexture = texture(textureImage_19_AO, vec2(vUv.x,vUv.y)).rgb;
-        vec3 albedo = texture(textureImage_Albedo, vec2(vUv.x,1-vUv.y)).rgb;
-        vec3 metallicTexture = texture(textureImage_19_Metallic, vec2(vUv.x,vUv.y)).rgb;
-        vec3 roughnessTexture = texture(textureImage_19_Roughness, vec2(vUv.x,vUv.y)).rgb;
-        //Extension 20
-        vec3 lespaul_20_AO = texture(textureImage_20_AO, vec2(vUv.x,vUv.y)).rgb;
-        vec3 lespaul_20_Base_Color = texture(textureImage_20_Base_Color, vec2(vUv.x,vUv.y)).rgb;
-        vec3 lespaul_20_Default_Normal = texture(textureImage_20_Default_Normal, vec2(vUv.x,vUv.y)).rgb;
-        vec3 lespaul_20_Metallic = texture(textureImage_20_Metallic, vec2(vUv.x,vUv.y)).rgb;
-        vec3 lespaul_20_Roughness = texture(textureImage_20_Roughness, vec2(vUv.x,vUv.y)).rgb;
-        vec3 lespaul_internal_AO = texture(textureImage_internal_AO, vec2(vUv.x,vUv.y)).rgb;
+        vec3 Normal = texture(Normal_Map, vec2(vUv.x,vUv.y)).rgb;
+        vec3 AOTexture = texture(AO_Map, vec2(vUv.x,vUv.y)).rgb;
+        vec3 albedo = texture(Albedo_Map, vec2(vUv.x,1-vUv.y)).rgb;
+        vec3 metallicTexture = texture(Metallic_Map, vec2(vUv.x,vUv.y)).rgb;
+        vec3 roughnessTexture = texture(Roughness_Map, vec2(vUv.x,vUv.y)).rgb;
         
         //Constants
         float PI = 3.1415;
@@ -178,15 +207,18 @@ const char *pixelShader = R"(
         vec3 L = normalize(light-vPoint);  // light vector
         vec3 L2 = normalize(light2-vPoint);  // light vector2
         vec3 E = normalize(vPoint);        // eye vector
-        
+        //Change here
+        //lightDir = normalize(vec3(gl_LightSource[0].position));
+        //L = lightDir;        
 
         //Dots + Half Vector - Lights
         vec3 R = reflect(L, N);
         vec3 H = normalize(E + L); //Half Vector            
-        float NoL = abs(dot(N, L));          
-        float RoE = abs(dot(R, E));          
+        float NoL = clamp(dot(N, L), 0.0, 1.0);          
+        //float RoE = abs(dot(R, E));          
         float NoE = abs(dot(N, E));
-        float LoH = abs(dot(L, H));
+        float NoH = clamp(dot(N, H), 0.0,1.0);
+        float LoH = max(dot(L, H),0.0);
 
         //Dots + Half Vector - Lights 2
         vec3 R2 = reflect(L2, N);
@@ -211,19 +243,59 @@ const char *pixelShader = R"(
         vec3 diffuse = albedo;
     
         //Specular
+        //Blinn Phong
+        float Blinn = pow(NoH, 70);
+
+        // Cook Torrance
+        float f90 = 0.5 + 2.0 * roughnessTexture.r * LoH * LoH;
+        vec3 D = DistributionFunction(NoH, roughnessTexture);
+        vec3 G = GeometryFunction(NoE, NoL, roughnessTexture);
+        float F = F_Schlick(NoL, 1.0, f90);
+        vec3 CookTorrance = (D * F * G);
+        
         
         //Jules Code
         //Light Intensity
         //float d = NoL;
         //float s = RoE;
         //float intensity = clamp(d+pow(s, 50), 0, 1);
-        
-
+       
         //Light Intensity
-        float intensity = 3.0;
+        float intensity = 10.0;
+        
+        // Test
+        if (show_lambert_model)
+        {
+            diffuse = vec3(intensity * albedo.rgb*Lambert);
+            pColor = vec4(diffuse, 1);
+        }
+        else if (show_disney_model)
+        {
+            diffuse = vec3(intensity * albedo.rgb * Disney);
+            pColor = vec4(diffuse,1);
+        }
+        else if (show_orennayar_model)
+        {
+            pColor = vec4(1,0,0,1);
+        }
+        else // Current code
+        {
+            //pColor = vec4(intensity * diffuse * NoL, 1) + vec4(intensity * diffuse * NoL2, 1);
+            pColor = vec4(0,1,0,1);
+        }
 
-        pColor = vec4(intensity * diffuse * NoL, 1) + vec4(intensity * diffuse * NoL2, 1);
-
+        if (show_blinnphong_model)
+        {
+            vec3 specular = vec3(Blinn, Blinn, Blinn);
+            vec3 direct = (diffuse + specular) * NoL;
+            pColor = vec4(direct, 1);
+        }
+        else if (show_cooktorrance_model)
+        {
+            vec3 specular = CookTorrance;
+            vec3 direct = (diffuse + specular) * NoL;
+            pColor = vec4(direct,1);
+        }
 
     }
 )";
@@ -413,21 +485,31 @@ void Mesh::Draw() {
     glActiveTexture(GL_TEXTURE1 + id11);
     glBindTexture(GL_TEXTURE_2D, textureId11);
 
-    SetUniform(shader, "textureImage_Albedo", (int)textureId);
-    SetUniform(shader, "textureImage_Normal", (int)textureId2);
-    SetUniform(shader, "textureImage_19_AO", (int)textureId3);
-    SetUniform(shader, "textureImage_19_Metallic", (int)textureId4);
-    SetUniform(shader, "textureImage_19_Roughness", (int)textureId5);
-    SetUniform(shader, "textureImage_20_AO", (int)textureId6);
-    SetUniform(shader, "textureImage_20_Base_Color", (int)textureId7);
-    SetUniform(shader, "textureImage_20_Default_Normal", (int)textureId8);
-    SetUniform(shader, "textureImage_20_Metallic", (int)textureId8);
-    SetUniform(shader, "textureImage_20_Roughness", (int)textureId10);
-    SetUniform(shader, "textureImage_internal_AO", (int)textureId11);
+    SetUniform(shader, "Albedo_Map", (int)textureId);
+    SetUniform(shader, "Normal_Map", (int)textureId2);
+    SetUniform(shader, "AO_Map", (int)textureId3);
+    SetUniform(shader, "Metallic_Map", (int)textureId4);
+    SetUniform(shader, "Roughness_Map", (int)textureId5);
+    // all 20 textures go here
+    //SetUniform(shader, "textureImage_internal_AO", (int)textureId11);
 
     SetUniform(shader, "modelview", camera.modelview*xform);
     SetUniform(shader, "persp", camera.persp);
-    glDrawElements(GL_TRIANGLES, 3*triangles.size(), GL_UNSIGNED_INT, &triangles[0]);
+    //glDrawElements(GL_TRIANGLES, 3 * triangles.size(), GL_UNSIGNED_INT, &triangles[0]);
+
+    glDrawElements(GL_TRIANGLES, 3 * 2500, GL_UNSIGNED_INT, &triangles[0]);
+
+    SetUniform(shader, "Albedo_Map", (int)textureId6);
+    SetUniform(shader, "Normal_Map", (int)textureId7);
+    SetUniform(shader, "AO_Map", (int)textureId8);
+    SetUniform(shader, "Metallic_Map", (int)textureId9);
+    SetUniform(shader, "Roughness_Map", (int)textureId10);
+
+    SetUniform(shader, "modelview", camera.modelview * xform);
+    SetUniform(shader, "persp", camera.persp);
+
+
+    glDrawElements(GL_TRIANGLES, 3 * (triangles.size() - 2500), GL_UNSIGNED_INT, &triangles[2500]);
 }
 
 bool Mesh::Read(int mid, char *name, mat4 *m) {
@@ -440,12 +522,12 @@ bool Mesh::Read(int mid, char *name, mat4 *m) {
     string textureFilename3 = "lespaul_19_AO.tga";
     string textureFilename4 = "lespaul_19_Metallic.tga";
     string textureFilename5 = "lespaul_19_Roughness.tga";
-    string textureFilename6 = "lespaul_20_AO.tga";
-    string textureFilename7 = "lespaul_20_Base_Color.tga";
-    string textureFilename8 = "lespaul_20_Default_Normal.tga";
+    string textureFilename6 = "lespaul_20_Base_Color.tga";
+    string textureFilename7 = "lespaul_20_Default_Normal.tga";
+    string textureFilename8 = "lespaul_20_AO.tga"; 
     string textureFilename9 = "lespaul_20_Metallic.tga";
     string textureFilename10 = "lespaul_20_Roughness.tga";
-    string textureFilename11 = "lespaul_internal_AO.tga";
+    //string textureFilename11 = "lespaul_internal_AO.tga";
     if (!ReadAsciiObj((char *) objectFilename.c_str(), points, triangles, &normals, &uvs)) {
         printf("can't read %s\n", objectFilename.c_str());
         return false;
@@ -462,7 +544,7 @@ bool Mesh::Read(int mid, char *name, mat4 *m) {
     textureId8 = LoadTexture((char*)textureFilename8.c_str(), id8);
     textureId9 = LoadTexture((char*)textureFilename9.c_str(), id9);
     textureId10 = LoadTexture((char*)textureFilename10.c_str(), id10);
-    textureId11 = LoadTexture((char*)textureFilename11.c_str(), id11);
+    //textureId11 = LoadTexture((char*)textureFilename11.c_str(), id11);
     if (m)
         xform = *m;
     framer.Set(&xform, 100, camera.persp*camera.modelview);
@@ -499,7 +581,9 @@ void Display() {
         glDisable(GL_DEPTH_TEST);
         UseDrawShader(camera.fullview);
         Disk(light, 9, vec3(1,1,0));
-        Disk(light2, 9, vec3(1, 1, 0));
+        
+        // Change the color of the dot to green
+        Disk(light2, 9, vec3(0, 1, 0));
         for (size_t i = 0; i < meshes.size(); i++) {
             mat4 &f = meshes[i].xform;
             vec3 base(f[0][3], f[1][3], f[2][3]);
@@ -510,7 +594,11 @@ void Display() {
         if (picked == &camera)
             camera.arcball.Draw(); // camera.fullview);
     }
-    glFlush();
+
+    // Since we are using ImGui and glFlush() can be
+    // called only once per cycle,
+    // Call glFlush() in the main loop instead.
+    //glFlush();
 }
 
 // Mouse
@@ -531,10 +619,30 @@ bool Shift(GLFWwindow *w) {
            glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
 }
 
+bool isMouseInMenu(int x, int y)
+{
+    // TODO: ImGUI crashes w/o the context
+    // Do I have to pass the ImGUI context?
+    // Is there a better way to do this?
+    //ImVec2 winSize = ImGui::GetWindowSize();
+    //ImVec2 winPos = ImGui::GetWindowPos();
+
+    if (x <= 250 && y <= 350)
+        return true;
+    else
+        return false;
+
+}
 void MouseButton(GLFWwindow *w, int butn, int action, int mods) {
     double x, y;
     glfwGetCursorPos(w, &x, &y);
     CorrectMouse(w, &x, &y);
+
+    if (isMouseInMenu(x, y))
+    {
+        return;
+    }
+
     if (action == GLFW_PRESS && butn == GLFW_MOUSE_BUTTON_LEFT) {
         void *newPicked = NULL;
         if (MouseOver(x, y, light, camera.fullview)) {
@@ -577,6 +685,12 @@ void MouseButton(GLFWwindow *w, int butn, int action, int mods) {
 
 void MouseMove(GLFWwindow *w, double x, double y) {
     mouseMoved = clock();
+    // insert code here
+    if (isMouseInMenu(x, y))
+    {
+        return;
+    }
+
     if (glfwGetMouseButton(w, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) { // drag
         y = WindowHeight(w)-y;
         if (picked == &mover)
@@ -614,11 +728,31 @@ void Keyboard(GLFWwindow *w, int c, int scancode, int action, int mods) {
         }
 }
 
-int main(int ac, char **av) {
-            
+int main(int ac, char **av) { 
+    
+    // Setup window
+    glfwSetErrorCallback(glfw_error_callback);
+
     // init app window and GL context
     glfwInit();
-   
+
+    // Decide GL+GLSL versions
+#if __APPLE__
+    // GL 3.2 + GLSL 150
+    const char* glsl_version = "#version 150";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
+#else
+    // GL 3.0 + GLSL 130
+    const char* glsl_version = "#version 130";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+    //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+#endif
+
     GLFWwindow *w = glfwCreateWindow(winW, winH, "BRDF", NULL, NULL);
     glfwSetWindowPos(w, 100, 100);
     glfwMakeContextCurrent(w);
@@ -627,6 +761,54 @@ int main(int ac, char **av) {
     //change window title
     glfwSetWindowTitle(w, "Biderectional Reflectance Distribution Function ");
     
+    // Imgui stuff
+
+        // Initialize OpenGL loader
+#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
+    bool err = gl3wInit() != 0;
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+    bool err = glewInit() != GLEW_OK;
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
+    bool err = gladLoadGL() == 0;
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
+    bool err = false;
+    glbinding::Binding::initialize();
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
+    bool err = false;
+    glbinding::initialize([](const char* name) { return (glbinding::ProcAddress)glfwGetProcAddress(name); });
+#else
+    bool err = false; // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to requires some form of initialization.
+#endif
+    if (err)
+    {
+        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+        return 1;
+    }
+
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    // No need to declare a default font
+    // However, the default font is ugly.
+    io.Fonts->AddFontFromFileTTF("BAUHS93.TTF", 15);
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
+
+    // Setup Platform/Renderer bindings
+    
+    // Original Stuff
+    ImGui_ImplGlfw_InitForOpenGL(w, true);
+    //ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplOpenGL3_Init((char*)glGetString(GL_NUM_SHADING_LANGUAGE_VERSIONS));
+
+    // End of Imgui stuff
+
+
     // build shader program, read scene file
     shader = LinkProgramViaCode(&vertexShader, &pixelShader);
     if (ReadScene(sceneFilename))
@@ -643,7 +825,7 @@ int main(int ac, char **av) {
                 meshes.resize(--nMeshes);
         }
     }
-    
+
     Resize(w, winW, winH); // initialize camera.arcball.fixedBase
     printf("Usage:\n  R: read scene\n  S: save scene\n  L: list scene\n  D: delete mesh\n  A: add mesh\n");
     // callbacks
@@ -654,54 +836,230 @@ int main(int ac, char **av) {
     glfwSetWindowSizeCallback(w, Resize);
 
     /* ImGUI Stuff*/
-    // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    bool show_demo_window = false;
+    bool show_settings_window = true;
+    bool show_lambert_model = false;
+    bool show_disney_model = false;
+    bool show_orennayar_model = false;
+    bool show_blinnphong_model = false;
+    bool show_cooktorrance_model = false;
+    bool show_extras = true;
+    bool move_guitar_updown = false;
+    //time_t current_time;
+    
+    //ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    ImVec4 clear_color = ImVec4(0.5f, 0.5f, 0.5f, 1.00f);
     /* End of ImGUI stuff*/
-
 
     // event loop
     glfwSwapInterval(1);
     while (!glfwWindowShouldClose(w)) {
-               
         Display();
-        // AntTweakBar test
-        //TwDraw();
-        //Orginal Swap buffer goes here****
-        //glfwSwapBuffers(w);
         glfwPollEvents();
 
-        /***************IMGUI TEST*************************/
+        /*************** IMGUI Code *************************/
         // Start the Dear ImGui frame
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+
+        // Show the Lambert Model
+        if (show_lambert_model)
         {
-            static float f = 0.0f;
-            static int counter = 0;
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
+            SetUniform(shader, "show_lambert_model", 1);
         }
+        else
+        {
+            SetUniform(shader, "show_lambert_model", 0);
+        }
+
+        // Show the Disney Model
+        if (show_disney_model)
+            SetUniform(shader, "show_disney_model", 1);
+        else
+            SetUniform(shader, "show_disney_model", 0);
+
+        // Show the Oren Nayar Model
+        if (show_orennayar_model)
+            SetUniform(shader, "show_orennayar_model", 1);
+        else
+            SetUniform(shader, "show_orennayar_model", 0);
+
+        // Show the Blinn Phong Model
+        if (show_blinnphong_model)
+            SetUniform(shader, "show_blinnphong_model", 1);
+        else
+            SetUniform(shader, "show_blinnphong_model", 0);
+
+        // Show the Cook Torrance Model
+        if (show_cooktorrance_model)
+            SetUniform(shader, "show_cooktorrance_model", 1);
+        else
+            SetUniform(shader, "show_cooktorrance_model", 0);
+
+        if (show_settings_window)
+        {
+            //static float f = 0.0f;
+            // Create a window called "BRDF Models" and append into it.
+            ImGui::Begin("BRDF Models", nullptr, ImGuiWindowFlags_NoResize);
+            ImGui::SetWindowSize(ImVec2(260, 330));
+            ImGui::SetWindowPos(ImVec2(0, 0));
+            //ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize;
+            
+
+            //ImVec2 winsize = ImGui::GetWindowSize();
+
+            // Display some text (you can use a format strings too)
+            //ImGui::Text("Select a Model:");
+            // Checkboxes
+            ImGui::SetWindowFontScale(1.3);
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Difusse");
+            //ImGui::Text("Difusse: ");
+            
+            // checkboxes work, but can select multiple
+            /*ImGui::SetWindowFontScale(1.1);
+            ImGui::Checkbox("Demo Window", &show_demo_window);      
+            ImGui::Checkbox("Lambert", &show_lambert_model);          
+            ImGui::Checkbox("Disney", &show_disney_model);
+            ImGui::Checkbox("Oren Nayar", &show_orennayar_model);*/
+            // End of checkboxes
+
+            // Trying with radio buttons
+            ImGui::SetWindowFontScale(1.1);
+            static int e = -1;
+            ImGui::RadioButton("Lambert   ", &e, 0);
+            ImGui::RadioButton("Disney    ", &e, 1); //ImGui::SameLine();
+            ImGui::RadioButton("Oren Nayar ", &e, 2);
+            static int i1 = 0;
+
+            if (e == 0)
+            {
+                SetUniform(shader, "show_lambert_model", 1);
+            }
+            else if (e == 1)
+            {
+                SetUniform(shader, "show_disney_model", 1);
+                ImGui::SliderInt("Roughfness", &i1, 1, 3);
+                ImGui::SetWindowSize(ImVec2(270, 360));
+            }
+            else if (e == 2)
+            {
+                SetUniform(shader, "show_orennayar_model", 1);
+                ImGui::SliderInt("Roughfness", &i1, 1, 3);
+                ImGui::SetWindowSize(ImVec2(270, 360));
+            }
+            // End of Testing radio buttons
+            
+            // Specular
+            ImGui::SetWindowFontScale(1.3);
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 1.0f, 1.0f), "Specular");
+            //ImGui::Text("Specular: ");
+            ImGui::SetWindowFontScale(1.1);
+            
+            static int e1 = -1;
+            ImGui::RadioButton("Blinn Phong ", &e1, 0);
+            ImGui::RadioButton("Cook Torrance ", &e1, 1);
+
+            if (e1 == 0)
+            {
+                SetUniform(shader, "show_blinnphong_model", 1);
+            }
+            else if (e1 == 1)
+            {
+                SetUniform(shader, "show_cooktorrance_model", 1);
+            }
+
+            ImGui::NewLine();
+            ImGui::SetWindowFontScale(1.5);
+            if (ImGui::Button("  Reset  "))
+            {
+                ImGui::SetWindowSize(ImVec2(260, 330));
+                show_lambert_model = false;
+                show_disney_model = false;
+                show_orennayar_model = false;
+                show_blinnphong_model = false;
+                show_cooktorrance_model = false;
+                e = -1;
+                e1 = -1;
+            }
+            
+            // Checkboxes for specular
+            //ImGui::Checkbox("Blinn Phong", &show_blinnphong_model);
+            //ImGui::Checkbox("Cook Torrance", &show_cooktorrance_model);
+            // End of checkboxes for specular
+            
+            // Could we use a slider in the future to manipulate
+            // Intensity?
+            //ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            
+
+            // Display FPS
+            //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+            /*if (ImGui::TreeNode("Difusse Test"))
+            {
+                static bool selection[3] = { true, false, false };
+                ImGui::Selectable("1. Lambert", &selection[0]);
+                ImGui::Selectable("2. Disney", &selection[1]);
+                ImGui::Selectable("3. Oren Nayar", &selection[2]);
+                ImGui::TreePop();
+            }*/
+
+            // Testing drop down menu
+            /*if (ImGui::TreeNode("Difusse Dropdown menu:"))
+            {
+                static int selected = -1;
+                for (int n = 0; n < 5; n++)
+                {
+                    char buf[32];
+                    sprintf(buf, "Object %d", n);
+                    if (ImGui::Selectable(buf, selected == n))
+                        selected = n;
+                }
+                ImGui::TreePop();
+            }*/
+
+            if (show_extras)
+            {
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Extras:");
+                ImGui::Checkbox("Move Guitar", &move_guitar_updown);
+                if (move_guitar_updown)
+                {
+                    SetUniform(shader, "move_guitar_updown", 1);
+                }
+                else
+                {
+                    SetUniform(shader, "move_guitar_updown", 0);
+                }
+            }
+
+            //auto t1 = std::chrono::high_resolution_clock::now();
+            //auto t2 = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::system_clock::now().time_since_epoch();
+            auto current_time = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+
+            //current_time = clock();
+            //current_time = time(0);
+            //auto current_time = std::chrono::system_clock::now();
+            //cout << "current time: " << current_time << endl;
+            //SetUniform(shader, "current_time", (int)current_time);
+            SetUniform(shader, "current_time", (int)current_time);
+
+            ImGui::End();
+            
+        }
+            
+        // Rendering
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        /*************** End IMGUI Code *************************/
+ 
+        glFlush();
         glfwSwapBuffers(w);
-        /***************IMGUI TEST*************************/
-        
+
     }
     // unbind vertex buffer, free GPU memory
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -712,8 +1070,8 @@ int main(int ac, char **av) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
     glfwDestroyWindow(w);
     glfwTerminate();
 }
-
 

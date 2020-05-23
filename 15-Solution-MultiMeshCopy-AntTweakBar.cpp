@@ -3,6 +3,7 @@
 
 
 #include <glad.h>
+#include <GLFW/glfw3.h>
 #include <time.h>
 #include "CameraArcball.h"
 #include "Draw.h"
@@ -10,53 +11,14 @@
 #include "Mesh.h"
 #include "Misc.h"
 #include "Widgets.h"
+#include <stdio.h>
 #include "Draw.h"
 #include "Quaternion.h"
 #include "GL/glut.h"
-#include "imgui.h"
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-#include <stdio.h>
+#include <AntTweakBar.h>
+#include <GL/gl.h>
+//#include <GLFW/glfw.h>
 
-// About Desktop OpenGL function loaders:
-//  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
-//  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
-//  You may use another loader/header of your choice (glext, glLoadGen, etc.), or chose to manually implement your own.
-#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-#include <GL/gl3w.h>            // Initialize with gl3wInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-#include <GL/glew.h>            // Initialize with glewInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-#include <glad/glad.h>          // Initialize with gladLoadGL()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/Binding.h>  // Initialize with glbinding::Binding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/glbinding.h>// Initialize with glbinding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#else
-#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-#endif
-
-#include <GLFW/glfw3.h>
-// Include glfw3.h after our OpenGL definitions
-//#include <GLFW/glfw3.h>
-
-// [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
-// To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
-// Your own project should not be affected, as you are likely to link with a newer binary of GLFW that is adequate for your version of Visual Studio.
-#if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
-#pragma comment(lib, "legacy_stdio_definitions")
-#endif
-
-static void glfw_error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-}
 
 using std::vector;
 using std::string;
@@ -64,7 +26,7 @@ using namespace std;
 
 // display
 GLuint      shader = 0;
-int         winW = 1600, winH = 600;
+int         winW = 1200, winH = 600;
 CameraAB    camera(0, 0, winW, winH, vec3(0,0,0), vec3(0,0,-5));
 
 // interaction
@@ -74,6 +36,20 @@ vec3        light2(-.3f, .3f, .2f);
 Framer      framer;     // to position/orient individual mesh
 Mover       mover;      // to position light
 void       *picked = &camera;
+
+// Callback function called by GLFW when window size changes
+//void GLFWCALL WindowSizeCB(int width, int height)
+//{
+//    // Set OpenGL viewport and camera
+//    glViewport(0, 0, width, height);
+//    glMatrixMode(0x1701);
+//    glLoadIdentity();
+//    gluPerspective(40, (double)width / height, 1, 10);
+//    gluLookAt(-1, 0, 3, 0, 0, 0, 0, 1, 0);
+//
+//    // Send the new window size to AntTweakBar
+//    TwWindowSize(width, height);
+//}
 
 // Mesh Class
 class Mesh {
@@ -99,6 +75,7 @@ public:
 };
 
 // Shaders
+
 const char *vertexShader = R"(
     #version 130
     in vec3 point;
@@ -614,18 +591,32 @@ void Keyboard(GLFWwindow *w, int c, int scancode, int action, int mods) {
         }
 }
 
+void display()
+{
+    glClearColor(0.0, 0.0, 0.0, 0.0);
+    glutWireTeapot(0.5);
+    glFlush();
+}
+
+
 int main(int ac, char **av) {
-            
+    
+    
     // init app window and GL context
     glfwInit();
-   
     GLFWwindow *w = glfwCreateWindow(winW, winH, "BRDF", NULL, NULL);
     glfwSetWindowPos(w, 100, 100);
     glfwMakeContextCurrent(w);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
 
-    //change window title
-    glfwSetWindowTitle(w, "Biderectional Reflectance Distribution Function ");
+    // AntTweakBar
+    float bgColor[] = { 0.1f, 0.2f, 0.4f };
+    TwInit(TW_OPENGL, NULL);
+    TwWindowSize(winW, winH);
+    TwBar* myBar;
+    myBar = TwNewBar("Mauri's Tweak Bar Example");
+    TwAddVarRW(myBar, "bgColor", TW_TYPE_COLOR3F, &bgColor, " Label='Background color' ");
+
     
     // build shader program, read scene file
     shader = LinkProgramViaCode(&vertexShader, &pixelShader);
@@ -653,54 +644,46 @@ int main(int ac, char **av) {
     glfwSetKeyCallback(w, Keyboard);
     glfwSetWindowSizeCallback(w, Resize);
 
-    /* ImGUI Stuff*/
-    // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    /* End of ImGUI stuff*/
+    //AntTweakBar
+    // Set GLFW event callbacks
+    // - Redirect window size changes to the callback function WindowSizeCB
+    //glfwSetWindowSizeCallback(WindowSizeCB);
+    // - Directly redirect GLFW mouse button events to AntTweakBar
+    //glfwSetMouseButtonCallback(w, (GLFWmousebuttonfun)TwEventMouseButtonGLFW);
+    
+    // - Directly redirect GLFW mouse position events to AntTweakBar  
+    //glfwSetCursorPosCallback(w, (GLFWcursorposfun)TwEventMousePosGLFW);
+    // Replaced by glfwSetMousePosCallback above
+    //glfwSetMousePosCallback((GLFWmouseposfun)TwEventMousePosGLFW);
+    // - Directly redirect GLFW mouse wheel events to AntTweakBar
+    //glfwSetMouseWheelCallback((GLFWmousewheelfun)TwEventMouseWheelGLFW);
+    // - Directly redirect GLFW key events to AntTweakBar
+    //glfwSetKeyCallback((GLFWkeyfun)TwEventKeyGLFW);
+    // - Directly redirect GLFW char events to AntTweakBar
+    //glfwSetCharCallback((GLFWcharfun)TwEventCharGLFW);
 
+    // Set GLFW event callbacks
+    // - Redirect window size changes to the callback function WindowSizeCB
+    //glfwSetWindowSizeCallback(WindowSizeCB);
+    // - Directly redirect GLFW mouse button events to AntTweakBar
+    //glfwSetMouseButtonCallback((GLFWmousebuttonfun)TwEventMouseButtonGLFW);
+    // - Directly redirect GLFW mouse position events to AntTweakBar
+    //glfwSetMousePosCallback((GLFWmouseposfun)TwEventMousePosGLFW);
+    // - Directly redirect GLFW mouse wheel events to AntTweakBar
+    //glfwSetMouseWheelCallback((GLFWmousewheelfun)TwEventMouseWheelGLFW);
+    // - Directly redirect GLFW key events to AntTweakBar
+    //glfwSetKeyCallback((GLFWkeyfun)TwEventKeyGLFW);
+    // - Directly redirect GLFW char events to AntTweakBar
+    //glfwSetCharCallback((GLFWcharfun)TwEventCharGLFW);
 
     // event loop
     glfwSwapInterval(1);
     while (!glfwWindowShouldClose(w)) {
-               
         Display();
         // AntTweakBar test
-        //TwDraw();
-        //Orginal Swap buffer goes here****
-        //glfwSwapBuffers(w);
-        glfwPollEvents();
-
-        /***************IMGUI TEST*************************/
-        // Start the Dear ImGui frame
-
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
+        TwDraw();
         glfwSwapBuffers(w);
-        /***************IMGUI TEST*************************/
+        glfwPollEvents();
         
     }
     // unbind vertex buffer, free GPU memory
@@ -708,12 +691,7 @@ int main(int ac, char **av) {
     for (size_t i = 0; i < meshes.size(); i++)
         glDeleteBuffers(1, &meshes[i].vBufferId);
 
-    // Cleanup
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
     glfwDestroyWindow(w);
+    TwTerminate();
     glfwTerminate();
 }
-
-

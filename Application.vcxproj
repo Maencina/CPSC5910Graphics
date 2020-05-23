@@ -19,15 +19,34 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="15-Solution-MultiMesh.cpp" />
+    <ClCompile Include="15-Solution-MultiMeshCopy-ImGui.cpp" />
+    <ClCompile Include="Include\GL\gl3w.c" />
     <ClCompile Include="Lib\CameraArcball.cpp" />
     <ClCompile Include="Lib\Draw.cpp" />
     <ClCompile Include="Lib\glad.c" />
     <ClCompile Include="Lib\GLXtras.cpp" />
+    <ClCompile Include="Lib\imgui.cpp" />
+    <ClCompile Include="Lib\imgui_demo.cpp" />
+    <ClCompile Include="Lib\imgui_draw.cpp" />
+    <ClCompile Include="Lib\imgui_impl_glfw.cpp" />
+    <ClCompile Include="Lib\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="Lib\imgui_widgets.cpp" />
     <ClCompile Include="Lib\Mesh.cpp" />
     <ClCompile Include="Lib\Misc.cpp" />
     <ClCompile Include="Lib\Quaternion.cpp" />
     <ClCompile Include="Lib\Widgets.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Include\GLFW\glfw3.h" />
+    <ClInclude Include="Include\GL\glcorearb.h" />
+    <ClInclude Include="Include\imconfig.h" />
+    <ClInclude Include="Include\imgui.h" />
+    <ClInclude Include="Include\imgui_impl_glfw.h" />
+    <ClInclude Include="Include\imgui_impl_opengl3.h" />
+    <ClInclude Include="Include\imgui_internal.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -108,7 +127,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>freetype.lib;glfwdll.lib;AntTweakBar.lib;freeglut.lib;glfw3.lib;opengl32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -138,7 +157,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>freetype.lib;glfwdll.lib;AntTweakBar.lib;freeglut.lib;glfw3.lib;opengl32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -159,5 +178,12 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="packages\AntTweakBar.1.16.4\build\native\AntTweakBar.targets" Condition="Exists('packages\AntTweakBar.1.16.4\build\native\AntTweakBar.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('packages\AntTweakBar.1.16.4\build\native\AntTweakBar.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\AntTweakBar.1.16.4\build\native\AntTweakBar.targets'))" />
+  </Target>
 </Project>
