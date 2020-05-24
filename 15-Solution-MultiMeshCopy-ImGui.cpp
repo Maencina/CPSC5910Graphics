@@ -118,7 +118,7 @@ const char *vertexShader = R"(
         vPoint = (modelview*vec4(point, 1)).xyz;
         if (move_guitar_updown)
         {        
-            vPoint.y += 0.5*sin(current_time/3);
+            vPoint.y += 0.5*sin(current_time);
         }
         vNormal = (modelview*vec4(normal, 0)).xyz;
         gl_Position = persp*vec4(vPoint, 1);
@@ -140,13 +140,10 @@ const char *pixelShader = R"(
     uniform sampler2D AO_Map;
     uniform sampler2D Metallic_Map;
     uniform sampler2D Roughness_Map;
-    /*uniform sampler2D textureImage_20_AO;
-    uniform sampler2D textureImage_20_Base_Color;
-    uniform sampler2D textureImage_20_Default_Normal;
-    uniform sampler2D textureImage_20_Metallic;
-    uniform sampler2D textureImage_20_Roughness;
-    uniform sampler2D textureImage_internal_AO;*/
     uniform mat4 modelview;
+    
+    // Spot Lights
+    uniform bool spot_light1;
 
     // Difusse
     uniform bool show_lambert_model;
@@ -205,26 +202,34 @@ const char *pixelShader = R"(
         //Information from the Vertex Shader
         vec3 N = normalize(vNormal);       // surface normal
         vec3 L = normalize(light-vPoint);  // light vector
-        vec3 L2 = normalize(light2-vPoint);  // light vector2
+        vec3 L1 = normalize(light2-vPoint);  // light vector2
         vec3 E = normalize(vPoint);        // eye vector
-        //Change here
-        //lightDir = normalize(vec3(gl_LightSource[0].position));
-        //L = lightDir;        
+        
+        
+        //Directional Light
+        vec3 lightDir = vec3(0.0, 0.0, 1.0);
+        L = lightDir; 
+        vec3 lightDirColor = vec3(1, 1, 1);  
+        float LightDirIntensity = 3.0;     
 
-        //Dots + Half Vector - Lights
+        //Dots + Half Vector - Directional Light
         vec3 R = reflect(L, N);
         vec3 H = normalize(E + L); //Half Vector            
-        float NoL = clamp(dot(N, L), 0.0, 1.0);          
-        //float RoE = abs(dot(R, E));          
+        float NoL = clamp(dot(N, L), 0.0, 1.0);                   
         float NoE = abs(dot(N, E));
         float NoH = clamp(dot(N, H), 0.0,1.0);
         float LoH = max(dot(L, H),0.0);
 
-        //Dots + Half Vector - Lights 2
-        vec3 R2 = reflect(L2, N);
-        vec3 H2 = normalize(E + L2); //Half Vector            
-        float NoL2 = abs(dot(N, L2));          
-        float LoH2 = abs(dot(L2, H));
+        //Point Light 1
+        vec3 lightPoint1Color = vec3(1, 0, 0);  
+        float LightPoint1Intensity = 2.0; 
+
+        //Dots + Half Vector - Point Light1
+        vec3 R1 = reflect(L1, N);
+        vec3 H1 = normalize(E + L1); //Half Vector            
+        float NoL1 = clamp(dot(N, L1), 0.0, 1.0);                 
+        float NoH1 = clamp(dot(N, H1), 0.0,1.0);
+        float LoH1 = max(dot(L1, H1),0.0);
         
         //f0
         float reflectance = 0.5;
@@ -237,21 +242,35 @@ const char *pixelShader = R"(
         //Disney
         float Disney = disneyDiffuse(NoE, NoL, LoH, f0.r, roughnessTexture.r);
 
-        //Disney2
-        float Disney2 = disneyDiffuse(NoE, NoL2, LoH2, f0.r, roughnessTexture.r);
+        //Disney1
+        float Disney1 = disneyDiffuse(NoE, NoL1, LoH1, f0.r, roughnessTexture.r);
 
-        vec3 diffuse = albedo;
+        vec3 diffuse = vec3(1,0,0);
+        vec3 diffuse1 = vec3(1,0,0);
+        vec3 specular = vec3(1,0,0);
+        vec3 specular1 = vec3(1,0,0);
+        
     
         //Specular
-        //Blinn Phong
+        //Blinn Phong - Directional Light
         float Blinn = pow(NoH, 70);
 
-        // Cook Torrance
+        //Blinn Phong - Point Light 1
+        float Blinn1 = pow(NoH1, 70);
+
+        // Cook Torrance - Directional Light
         float f90 = 0.5 + 2.0 * roughnessTexture.r * LoH * LoH;
         vec3 D = DistributionFunction(NoH, roughnessTexture);
         vec3 G = GeometryFunction(NoE, NoL, roughnessTexture);
         float F = F_Schlick(NoL, 1.0, f90);
         vec3 CookTorrance = (D * F * G);
+
+        // Cook Torrance - Point Light 1
+        float f901 = 0.5 + 2.0 * roughnessTexture.r * LoH1 * LoH1;
+        vec3 D1 = DistributionFunction(NoH1, roughnessTexture);
+        vec3 G1 = GeometryFunction(NoE, NoL1, roughnessTexture);
+        float F1 = F_Schlick(NoL1, 1.0, f901);
+        vec3 CookTorrance1 = (D1 * F1 * G1);
         
         
         //Jules Code
@@ -260,41 +279,55 @@ const char *pixelShader = R"(
         //float s = RoE;
         //float intensity = clamp(d+pow(s, 50), 0, 1);
        
-        //Light Intensity
-        float intensity = 10.0;
-        
         // Test
-        if (show_lambert_model)
+        if (spot_light1)
+        {}
+        
+        if (show_lambert_model && show_blinnphong_model)
         {
-            diffuse = vec3(intensity * albedo.rgb*Lambert);
-            pColor = vec4(diffuse, 1);
+           diffuse = vec3(LightDirIntensity * albedo.rgb * Lambert * lightDirColor); 
+           diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Lambert * lightPoint1Color);
+
+            vec3 specular = vec3(Blinn, Blinn, Blinn);
+            vec3 specular1 = vec3(Blinn1, Blinn1, Blinn1);
+
+            vec3 direct = (diffuse + specular) * NoL;
+            vec3 direct1 = (diffuse1 + specular1) * NoL1;
+            pColor = vec4(direct + direct1, 1);
         }
-        else if (show_disney_model)
+
+        else if (show_disney_model && show_blinnphong_model)
         {
-            diffuse = vec3(intensity * albedo.rgb * Disney);
-            pColor = vec4(diffuse,1);
+            diffuse = vec3(LightDirIntensity * albedo.rgb * Disney * lightDirColor);
+            diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Disney1 * lightPoint1Color);
+
+            specular = vec3(Blinn, Blinn, Blinn);
+            specular1 = vec3(Blinn1, Blinn1, Blinn1);
+
+            vec3 direct = (diffuse + specular) * NoL;
+            vec3 direct1 = (diffuse1 + specular1) * NoL1;
+
+            pColor = vec4(direct + direct1, 1);
         }
-        else if (show_orennayar_model)
+        else if (show_orennayar_model && show_blinnphong_model)
         {
             pColor = vec4(1,0,0,1);
         }
-        else // Current code
+        else if (show_lambert_model && show_cooktorrance_model)
         {
-            //pColor = vec4(intensity * diffuse * NoL, 1) + vec4(intensity * diffuse * NoL2, 1);
-            pColor = vec4(0,1,0,1);
-        }
+           diffuse = vec3(LightDirIntensity * albedo.rgb * Lambert * lightDirColor); 
+           diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Lambert * lightPoint1Color);
 
-        if (show_blinnphong_model)
-        {
-            vec3 specular = vec3(Blinn, Blinn, Blinn);
-            vec3 direct = (diffuse + specular) * NoL;
-            pColor = vec4(direct, 1);
-        }
-        else if (show_cooktorrance_model)
-        {
             vec3 specular = CookTorrance;
+            vec3 specular1 = CookTorrance1;
+
             vec3 direct = (diffuse + specular) * NoL;
-            pColor = vec4(direct,1);
+            vec3 direct1 = (diffuse1 + specular1) * NoL1;
+            pColor = vec4(direct + direct1, 1);
+        }
+        else
+        {
+            pColor = vec4(1,0,0,1);
         }
 
     }
@@ -845,6 +878,8 @@ int main(int ac, char **av) {
     bool show_cooktorrance_model = false;
     bool show_extras = true;
     bool move_guitar_updown = false;
+    bool spot_light1 = false;
+    bool enable_spot_light1 = true;
     //time_t current_time;
     
     //ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -905,10 +940,18 @@ int main(int ac, char **av) {
             //static float f = 0.0f;
             // Create a window called "BRDF Models" and append into it.
             ImGui::Begin("BRDF Models", nullptr, ImGuiWindowFlags_NoResize);
-            ImGui::SetWindowSize(ImVec2(260, 330));
+            ImGui::SetWindowSize(ImVec2(260, 390));
             ImGui::SetWindowPos(ImVec2(0, 0));
             //ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize;
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Spot Light");
             
+            if (enable_spot_light1)
+            {
+                ImGui::Checkbox("Spot Light1", &spot_light1);
+                SetUniform(shader, "spot_light1", 0);
+            }
+
+
 
             //ImVec2 winsize = ImGui::GetWindowSize();
 
@@ -943,13 +986,13 @@ int main(int ac, char **av) {
             {
                 SetUniform(shader, "show_disney_model", 1);
                 ImGui::SliderInt("Roughfness", &i1, 1, 3);
-                ImGui::SetWindowSize(ImVec2(270, 360));
+                ImGui::SetWindowSize(ImVec2(270, 420));
             }
             else if (e == 2)
             {
                 SetUniform(shader, "show_orennayar_model", 1);
                 ImGui::SliderInt("Roughfness", &i1, 1, 3);
-                ImGui::SetWindowSize(ImVec2(270, 360));
+                ImGui::SetWindowSize(ImVec2(270, 420));
             }
             // End of Testing radio buttons
             
@@ -976,7 +1019,7 @@ int main(int ac, char **av) {
             ImGui::SetWindowFontScale(1.5);
             if (ImGui::Button("  Reset  "))
             {
-                ImGui::SetWindowSize(ImVec2(260, 330));
+                ImGui::SetWindowSize(ImVec2(260, 390));
                 show_lambert_model = false;
                 show_disney_model = false;
                 show_orennayar_model = false;
@@ -1037,8 +1080,9 @@ int main(int ac, char **av) {
 
             //auto t1 = std::chrono::high_resolution_clock::now();
             //auto t2 = std::chrono::high_resolution_clock::now();
+            // Test Mauricio
             auto duration = std::chrono::system_clock::now().time_since_epoch();
-            auto current_time = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+            auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();           
 
             //current_time = clock();
             //current_time = time(0);
