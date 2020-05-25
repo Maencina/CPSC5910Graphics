@@ -74,6 +74,7 @@ Framer      framer;     // to position/orient individual mesh
 Mover       mover;      // to position light
 void       *picked = &camera;
 
+
 // Mesh Class
 
 class Mesh {
@@ -98,7 +99,7 @@ public:
         // read in object file (with normals, uvs) and texture map, initialize matrix, build vertex buffer
 };
 
-SYSTEMTIME getTime;
+
 
 // Shaders
 
@@ -141,6 +142,7 @@ const char *pixelShader = R"(
     uniform sampler2D Metallic_Map;
     uniform sampler2D Roughness_Map;
     uniform mat4 modelview;
+    uniform bool use_albedo_body;
     
     // Spot Lights
     uniform bool spot_light1;
@@ -192,7 +194,19 @@ const char *pixelShader = R"(
         //Extension 19
         vec3 Normal = texture(Normal_Map, vec2(vUv.x,vUv.y)).rgb;
         vec3 AOTexture = texture(AO_Map, vec2(vUv.x,vUv.y)).rgb;
-        vec3 albedo = texture(Albedo_Map, vec2(vUv.x,1-vUv.y)).rgb;
+        vec3 albedo;        
+
+        if (use_albedo_body)
+        {
+            albedo = texture(Albedo_Map, vec2(vUv.x,1-vUv.y)).rgb;
+        }
+        else
+        {
+            //test
+            albedo = texture(Albedo_Map, vec2(vUv.x,vUv.y)).rgb;
+            //EOT
+        }
+        
         vec3 metallicTexture = texture(Metallic_Map, vec2(vUv.x,vUv.y)).rgb;
         vec3 roughnessTexture = texture(Roughness_Map, vec2(vUv.x,vUv.y)).rgb;
         
@@ -221,8 +235,8 @@ const char *pixelShader = R"(
         float LoH = max(dot(L, H),0.0);
 
         //Point Light 1
-        vec3 lightPoint1Color = vec3(1, 0, 0);  
-        float LightPoint1Intensity = 2.0; 
+        vec3 lightPoint1Color = vec3(1, 1, 1);  
+        float LightPoint1Intensity = 3.0; 
 
         //Dots + Half Vector - Point Light1
         vec3 R1 = reflect(L1, N);
@@ -523,6 +537,7 @@ void Mesh::Draw() {
     SetUniform(shader, "AO_Map", (int)textureId3);
     SetUniform(shader, "Metallic_Map", (int)textureId4);
     SetUniform(shader, "Roughness_Map", (int)textureId5);
+    SetUniform(shader, "use_albedo_body", 1);
     // all 20 textures go here
     //SetUniform(shader, "textureImage_internal_AO", (int)textureId11);
 
@@ -530,19 +545,20 @@ void Mesh::Draw() {
     SetUniform(shader, "persp", camera.persp);
     //glDrawElements(GL_TRIANGLES, 3 * triangles.size(), GL_UNSIGNED_INT, &triangles[0]);
 
-    glDrawElements(GL_TRIANGLES, 3 * 2500, GL_UNSIGNED_INT, &triangles[0]);
+    glDrawElements(GL_TRIANGLES, 3 * 2664, GL_UNSIGNED_INT, &triangles[0]);
 
     SetUniform(shader, "Albedo_Map", (int)textureId6);
     SetUniform(shader, "Normal_Map", (int)textureId7);
     SetUniform(shader, "AO_Map", (int)textureId8);
     SetUniform(shader, "Metallic_Map", (int)textureId9);
     SetUniform(shader, "Roughness_Map", (int)textureId10);
+    SetUniform(shader, "use_albedo_body", 0);
 
     SetUniform(shader, "modelview", camera.modelview * xform);
     SetUniform(shader, "persp", camera.persp);
 
 
-    glDrawElements(GL_TRIANGLES, 3 * (triangles.size() - 2500), GL_UNSIGNED_INT, &triangles[2500]);
+    glDrawElements(GL_TRIANGLES, 3 * (triangles.size() - 2664), GL_UNSIGNED_INT, &triangles[2664]);
 }
 
 bool Mesh::Read(int mid, char *name, mat4 *m) {
