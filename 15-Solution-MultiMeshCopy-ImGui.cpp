@@ -1,9 +1,8 @@
 // MultiMesh.cpp - display and manipulate multiple OBJ meshes
 // (c) Jules Bloomenthal 2019, all rights reserved. Commercial use requires license.
 
-
+//#include "imGuIZMOquat.h"
 #include <glad.h>
-//#include <GLFW/glfw3.h>
 #include <time.h>
 #include "CameraArcball.h"
 #include "Draw.h"
@@ -15,50 +14,22 @@
 #include "Draw.h"
 #include "Quaternion.h"
 #include "GL/glut.h"
-//#include <AntTweakBar.h>
 #include "imgui.h"
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-// Stuff above works -- testing below
-//#include <imgui_impl_glfw_gl3.h>
-//#include "thread"
 #include <chrono>
-
-//// About Desktop OpenGL function loaders:
-////  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
-////  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
-////  You may use another loader/header of your choice (glext, glLoadGen, etc.), or chose to manually implement your own.
-//#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-//#include <GL/gl3w.h>            // Initialize with gl3wInit()
-//#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-//#include <GL/glew.h>            // Initialize with glewInit()
-//#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-//#include <glad/glad.h>          // Initialize with gladLoadGL()
-//#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-//#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-//#include <glbinding/Binding.h>  // Initialize with glbinding::Binding::initialize()
-//#include <glbinding/gl/gl.h>
-//using namespace gl;
-//#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-//#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-//#include <glbinding/glbinding.h>// Initialize with glbinding::initialize()
-//#include <glbinding/gl/gl.h>
-//using namespace gl;
-//#else
-//#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-//#endif
 #include <GL/gl3w.h> 
 #include <GLFW/glfw3.h>
 
+
+using std::vector;
+using std::string;
+using namespace std;
 
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
-
-using std::vector;
-using std::string;
-using namespace std;
 
 // display
 GLuint      shader = 0;
@@ -676,7 +647,7 @@ bool isMouseInMenu(int x, int y)
     //ImVec2 winSize = ImGui::GetWindowSize();
     //ImVec2 winPos = ImGui::GetWindowPos();
 
-    if (x <= 250 && y <= 350)
+    if (x <= 270 && y <= 420)
         return true;
     else
         return false;
@@ -1098,7 +1069,7 @@ int main(int ac, char **av) {
             //auto t2 = std::chrono::high_resolution_clock::now();
             // Test Mauricio
             auto duration = std::chrono::system_clock::now().time_since_epoch();
-            auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();           
+            auto current_time = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();           
 
             //current_time = clock();
             //current_time = time(0);
