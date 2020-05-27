@@ -1,8 +1,8 @@
 // MultiMesh.cpp - display and manipulate multiple OBJ meshes
 // (c) Jules Bloomenthal 2019, all rights reserved. Commercial use requires license.
 
-//#include "imGuIZMOquat.h"
 #include <glad.h>
+//#include "imGuIZMOquat.h"
 #include <time.h>
 #include "CameraArcball.h"
 #include "Draw.h"
@@ -84,13 +84,13 @@ const char *vertexShader = R"(
     out vec2 vUv;
     uniform mat4 modelview;
     uniform mat4 persp;
-    uniform int current_time;
+    uniform float current_time;
     uniform bool move_guitar_updown;
     void main() {
         vPoint = (modelview*vec4(point, 1)).xyz;
         if (move_guitar_updown)
         {        
-            vPoint.y += 0.5*sin(current_time);
+            vPoint.y += 0.2*sin(current_time);
         }
         vNormal = (modelview*vec4(normal, 0)).xyz;
         gl_Position = persp*vec4(vPoint, 1);
@@ -114,6 +114,9 @@ const char *pixelShader = R"(
     uniform sampler2D Roughness_Map;
     uniform mat4 modelview;
     uniform bool use_albedo_body;
+    // Bump mapping
+    uniform sampler2D bumpMap;
+    in vec2 uv;
     
     // Spot Lights
     uniform bool spot_light1;
@@ -157,7 +160,29 @@ const char *pixelShader = R"(
                 return a2 / (PI * f * f);
      }
 
+    // Bump mapping
+   /* vec3 BumpNormal() {
+        vec4 bumpV = texture(bumpMap, uv);
+        vec3 bv = vec3(2*bumpV.r-1, 2*bumpV.g-1, bumpV.b);
+        return normalize(bv);
+    }
     
+    vec3 TransformToLocal(vec3 b, vec3 u, vec3 v, vec3 n) {
+        float xx = b.x*u.x + b.y*v.x + b.z*n.x;
+        float yy = b.x*u.y + b.y*v.y + b.z*n.y;
+        float zz = b.x*u.z + b.y*v.z + b.z*n.z;
+        return normalize(vec3(xx, yy, zz));
+    }
+
+    vec2 du = dFdy(teUv), dv = dFdx(teUv);
+    vec3 dx = dFdy(tePoint), dy = dFdx(tePoint);
+    vec3 U = normalize(du.x * dx + du.y * dy);
+    vec3 V = normalize(dv.x * dx + dv.y * dy);
+    vec3 N = normalize(teNormal);
+    vec3 B = BumpNormal();
+    vec3 XN = TransformToLocal(B, U, V, N);
+    vec3 n = normalize(XN); */
+
 
     void main() {
      
@@ -195,13 +220,13 @@ const char *pixelShader = R"(
         vec3 lightDir = vec3(0.0, 0.0, 1.0);
         L = lightDir; 
         vec3 lightDirColor = vec3(1, 1, 1);  
-        float LightDirIntensity = 3.0;     
+        float LightDirIntensity = 4.0;     
 
         //Dots + Half Vector - Directional Light
         vec3 R = reflect(L, N);
         vec3 H = normalize(E + L); //Half Vector            
         float NoL = clamp(dot(N, L), 0.0, 1.0);                   
-        float NoE = abs(dot(N, E));
+        float NoE = max(0,abs(dot(N, E)));
         float NoH = clamp(dot(N, H), 0.0,1.0);
         float LoH = max(dot(L, H),0.0);
 
@@ -238,10 +263,10 @@ const char *pixelShader = R"(
     
         //Specular
         //Blinn Phong - Directional Light
-        float Blinn = pow(NoH, 70);
+        float Blinn = clamp(pow(NoH, 4),0,1);
 
         //Blinn Phong - Point Light 1
-        float Blinn1 = pow(NoH1, 70);
+        float Blinn1 = clamp(pow(NoH1, 4),0,1);
 
         // Cook Torrance - Directional Light
         float f90 = 0.5 + 2.0 * roughnessTexture.r * LoH * LoH;
@@ -264,9 +289,9 @@ const char *pixelShader = R"(
         //float s = RoE;
         //float intensity = clamp(d+pow(s, 50), 0, 1);
        
-        // Test
-        if (spot_light1)
-        {}
+        // TODO
+        if (spot_light1){};
+        if (show_orennayar_model) {};
         
         if (show_lambert_model && show_blinnphong_model)
         {
@@ -280,23 +305,18 @@ const char *pixelShader = R"(
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
             pColor = vec4(direct + direct1, 1);
         }
-
         else if (show_disney_model && show_blinnphong_model)
         {
             diffuse = vec3(LightDirIntensity * albedo.rgb * Disney * lightDirColor);
             diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Disney1 * lightPoint1Color);
 
-            specular = vec3(Blinn, Blinn, Blinn);
-            specular1 = vec3(Blinn1, Blinn1, Blinn1);
+            specular = Blinn * lightDirColor;
+            specular1 = Blinn1 * lightPoint1Color;
 
             vec3 direct = (diffuse + specular) * NoL;
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
 
             pColor = vec4(direct + direct1, 1);
-        }
-        else if (show_orennayar_model && show_blinnphong_model)
-        {
-            pColor = vec4(1,0,0,1);
         }
         else if (show_lambert_model && show_cooktorrance_model)
         {
@@ -309,6 +329,46 @@ const char *pixelShader = R"(
             vec3 direct = (diffuse + specular) * NoL;
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
             pColor = vec4(direct + direct1, 1);
+        }
+        else if (show_disney_model && show_cooktorrance_model)
+        {
+           diffuse = vec3(LightDirIntensity * albedo.rgb * Disney * lightDirColor); 
+           diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Disney1 * lightPoint1Color);
+
+            vec3 specular = CookTorrance;
+            vec3 specular1 = CookTorrance1;
+
+            vec3 direct = (diffuse + specular) * NoL;
+            vec3 direct1 = (diffuse1 + specular1) * NoL1;
+            pColor = vec4(direct + direct1, 1);
+        }
+        else if (show_blinnphong_model)
+        {
+            specular = Blinn * lightDirColor;
+            specular1 = Blinn1 * lightPoint1Color;
+
+            pColor = vec4(specular + specular1, 1);
+        }
+        else if (show_cooktorrance_model)
+        {
+            vec3 specular = CookTorrance * lightDirColor;
+            vec3 specular1 = CookTorrance1 * lightPoint1Color;
+
+            pColor = vec4(specular + specular1, 1);
+        }
+        else if (show_lambert_model)
+        {
+           diffuse = vec3(LightDirIntensity * albedo.rgb * Lambert * lightDirColor); 
+           diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Lambert * lightPoint1Color);
+
+            pColor = vec4(diffuse + diffuse1, 1);
+        }
+        else if (show_disney_model)
+        {
+           diffuse = vec3(LightDirIntensity * albedo.rgb * Disney * lightDirColor); 
+           diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Disney1 * lightPoint1Color);
+
+            pColor = vec4(diffuse + diffuse1, 1);
         }
         else
         {
@@ -516,7 +576,7 @@ void Mesh::Draw() {
     SetUniform(shader, "persp", camera.persp);
     //glDrawElements(GL_TRIANGLES, 3 * triangles.size(), GL_UNSIGNED_INT, &triangles[0]);
 
-    glDrawElements(GL_TRIANGLES, 3 * 2664, GL_UNSIGNED_INT, &triangles[0]);
+    glDrawElements(GL_TRIANGLES, 3 * 2400, GL_UNSIGNED_INT, &triangles[0]);
 
     SetUniform(shader, "Albedo_Map", (int)textureId6);
     SetUniform(shader, "Normal_Map", (int)textureId7);
@@ -529,13 +589,13 @@ void Mesh::Draw() {
     SetUniform(shader, "persp", camera.persp);
 
 
-    glDrawElements(GL_TRIANGLES, 3 * (triangles.size() - 2664), GL_UNSIGNED_INT, &triangles[2664]);
+    glDrawElements(GL_TRIANGLES, 3 * (triangles.size() - 2400), GL_UNSIGNED_INT, &triangles[2400]);
 }
 
 bool Mesh::Read(int mid, char *name, mat4 *m) {
     id = mid;
     filename = string(name);
-    string objectFilename = filename+".obj";
+    string objectFilename = "lespaul.obj";
     //string objectFilename =  "lespaul_details.obj";
     string textureFilename = "lespaul_Albedo.tga";
     string textureFilename2 = "lespaulnormal.tga";
@@ -872,7 +932,7 @@ int main(int ac, char **av) {
     //ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     ImVec4 clear_color = ImVec4(0.5f, 0.5f, 0.5f, 1.00f);
     /* End of ImGUI stuff*/
-
+    float angle = 0.0;
     // event loop
     glfwSwapInterval(1);
     while (!glfwWindowShouldClose(w)) {
@@ -1068,17 +1128,18 @@ int main(int ac, char **av) {
             //auto t1 = std::chrono::high_resolution_clock::now();
             //auto t2 = std::chrono::high_resolution_clock::now();
             // Test Mauricio
-            auto duration = std::chrono::system_clock::now().time_since_epoch();
-            auto current_time = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();           
+            //auto duration = std::chrono::system_clock::now()
+            //auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
             //current_time = clock();
             //current_time = time(0);
             //auto current_time = std::chrono::system_clock::now();
             //cout << "current time: " << current_time << endl;
             //SetUniform(shader, "current_time", (int)current_time);
-            SetUniform(shader, "current_time", (int)current_time);
+            SetUniform(shader, "current_time", angle);
 
             ImGui::End();
+            angle += 0.01f;
             
         }
             
