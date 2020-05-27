@@ -1,8 +1,8 @@
 // MultiMesh.cpp - display and manipulate multiple OBJ meshes
 // (c) Jules Bloomenthal 2019, all rights reserved. Commercial use requires license.
 
-#include <glad.h>
 //#include "imGuIZMOquat.h"
+#include <glad.h>
 #include <time.h>
 #include "CameraArcball.h"
 #include "Draw.h"
@@ -115,8 +115,11 @@ const char *pixelShader = R"(
     uniform mat4 modelview;
     uniform bool use_albedo_body;
     // Bump mapping
-    uniform sampler2D bumpMap;
+    /*uniform sampler2D bumpMap;
     in vec2 uv;
+    in vec2 teUv;
+    in vec3 tePoint;
+    in vec3 teNormal;*/
     
     // Spot Lights
     uniform bool enable_spot_light1;
@@ -161,7 +164,7 @@ const char *pixelShader = R"(
      }
 
     // Bump mapping
-   /* vec3 BumpNormal() {
+    /*vec3 BumpNormal() {
         vec4 bumpV = texture(bumpMap, uv);
         vec3 bv = vec3(2*bumpV.r-1, 2*bumpV.g-1, bumpV.b);
         return normalize(bv);
@@ -181,7 +184,7 @@ const char *pixelShader = R"(
     vec3 N = normalize(teNormal);
     vec3 B = BumpNormal();
     vec3 XN = TransformToLocal(B, U, V, N);
-    vec3 n = normalize(XN); */
+    vec3 n = normalize(XN);*/
 
 
     void main() {
