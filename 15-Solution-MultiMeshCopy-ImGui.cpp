@@ -119,7 +119,7 @@ const char *pixelShader = R"(
     in vec2 uv;
     
     // Spot Lights
-    uniform bool spot_light1;
+    uniform bool enable_spot_light1;
 
     // Difusse
     uniform bool show_lambert_model;
@@ -290,7 +290,6 @@ const char *pixelShader = R"(
         //float intensity = clamp(d+pow(s, 50), 0, 1);
        
         // TODO
-        if (spot_light1){};
         if (show_orennayar_model) {};
         
         if (show_lambert_model && show_blinnphong_model)
@@ -303,7 +302,15 @@ const char *pixelShader = R"(
 
             vec3 direct = (diffuse + specular) * NoL;
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
-            pColor = vec4(direct + direct1, 1);
+            
+            if (enable_spot_light1)
+            {
+                pColor = vec4(direct + direct1, 1);
+            }
+            else
+            {
+                pColor = vec4(direct, 1);
+            }
         }
         else if (show_disney_model && show_blinnphong_model)
         {
@@ -316,7 +323,14 @@ const char *pixelShader = R"(
             vec3 direct = (diffuse + specular) * NoL;
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
 
-            pColor = vec4(direct + direct1, 1);
+            if (enable_spot_light1)
+            {
+                pColor = vec4(direct + direct1, 1);
+            }
+            else
+            {
+                pColor = vec4(direct, 1);
+            }
         }
         else if (show_lambert_model && show_cooktorrance_model)
         {
@@ -328,7 +342,14 @@ const char *pixelShader = R"(
 
             vec3 direct = (diffuse + specular) * NoL;
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
-            pColor = vec4(direct + direct1, 1);
+             if (enable_spot_light1)
+            {
+                pColor = vec4(direct + direct1, 1);
+            }
+            else
+            {
+                pColor = vec4(direct, 1);
+            }
         }
         else if (show_disney_model && show_cooktorrance_model)
         {
@@ -340,7 +361,14 @@ const char *pixelShader = R"(
 
             vec3 direct = (diffuse + specular) * NoL;
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
-            pColor = vec4(direct + direct1, 1);
+            if (enable_spot_light1)
+            {
+                pColor = vec4(direct + direct1, 1);
+            }
+            else
+            {
+                pColor = vec4(direct, 1);
+            }
         }
         else if (show_blinnphong_model)
         {
@@ -925,8 +953,8 @@ int main(int ac, char **av) {
     bool show_cooktorrance_model = false;
     bool show_extras = true;
     bool move_guitar_updown = false;
-    bool spot_light1 = false;
-    bool enable_spot_light1 = true;
+    //bool spot_light1 = false;
+    bool enable_spot_light1 = false;
     //time_t current_time;
     
     //ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -990,15 +1018,6 @@ int main(int ac, char **av) {
             ImGui::SetWindowSize(ImVec2(260, 390));
             ImGui::SetWindowPos(ImVec2(0, 0));
             //ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize;
-            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Spot Light");
-            
-            if (enable_spot_light1)
-            {
-                ImGui::Checkbox("Spot Light1", &spot_light1);
-                SetUniform(shader, "spot_light1", 0);
-            }
-
-
 
             //ImVec2 winsize = ImGui::GetWindowSize();
 
@@ -1062,6 +1081,22 @@ int main(int ac, char **av) {
                 SetUniform(shader, "show_cooktorrance_model", 1);
             }
 
+            ImGui::SetWindowFontScale(1.3);
+            //ImGui::NewLine();
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Spot Light");
+            ImGui::SetWindowFontScale(1.1);
+            ImGui::Checkbox("Use Spot Light1", &enable_spot_light1);
+           
+            if (enable_spot_light1)
+            {
+               
+                SetUniform(shader, "enable_spot_light1", 1);
+            }
+            else
+            {
+                SetUniform(shader, "enable_spot_light1", 0);
+            }
+
             ImGui::NewLine();
             ImGui::SetWindowFontScale(1.5);
             if (ImGui::Button("  Reset  "))
@@ -1072,6 +1107,7 @@ int main(int ac, char **av) {
                 show_orennayar_model = false;
                 show_blinnphong_model = false;
                 show_cooktorrance_model = false;
+                enable_spot_light1 = false;
                 e = -1;
                 e1 = -1;
             }
@@ -1125,20 +1161,10 @@ int main(int ac, char **av) {
                 }
             }
 
-            //auto t1 = std::chrono::high_resolution_clock::now();
-            //auto t2 = std::chrono::high_resolution_clock::now();
-            // Test Mauricio
-            //auto duration = std::chrono::system_clock::now()
-            //auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-
-            //current_time = clock();
-            //current_time = time(0);
-            //auto current_time = std::chrono::system_clock::now();
-            //cout << "current time: " << current_time << endl;
-            //SetUniform(shader, "current_time", (int)current_time);
-            SetUniform(shader, "current_time", angle);
-
             ImGui::End();
+
+            // Move the guitar up and down
+            SetUniform(shader, "current_time", angle);
             angle += 0.01f;
             
         }
