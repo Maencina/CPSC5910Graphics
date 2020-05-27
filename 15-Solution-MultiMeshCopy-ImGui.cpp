@@ -576,7 +576,7 @@ void Mesh::Draw() {
     SetUniform(shader, "persp", camera.persp);
     //glDrawElements(GL_TRIANGLES, 3 * triangles.size(), GL_UNSIGNED_INT, &triangles[0]);
 
-    glDrawElements(GL_TRIANGLES, 3 * 2400, GL_UNSIGNED_INT, &triangles[0]);
+    glDrawElements(GL_TRIANGLES, 3 * 2050, GL_UNSIGNED_INT, &triangles[0]);
 
     SetUniform(shader, "Albedo_Map", (int)textureId6);
     SetUniform(shader, "Normal_Map", (int)textureId7);
@@ -585,11 +585,11 @@ void Mesh::Draw() {
     SetUniform(shader, "Roughness_Map", (int)textureId10);
     SetUniform(shader, "use_albedo_body", 0);
 
-    SetUniform(shader, "modelview", camera.modelview * xform);
-    SetUniform(shader, "persp", camera.persp);
+    /*SetUniform(shader, "modelview", camera.modelview * xform);
+    SetUniform(shader, "persp", camera.persp);*/
 
 
-    glDrawElements(GL_TRIANGLES, 3 * (triangles.size() - 2400), GL_UNSIGNED_INT, &triangles[2400]);
+    glDrawElements(GL_TRIANGLES, 3 * (triangles.size() - 2050), GL_UNSIGNED_INT, &triangles[2050]);
 }
 
 bool Mesh::Read(int mid, char *name, mat4 *m) {
