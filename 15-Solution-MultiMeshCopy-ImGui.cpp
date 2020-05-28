@@ -123,11 +123,12 @@ const char *pixelShader = R"(
     
     // Spot Lights
     uniform bool enable_spot_light1;
+    uniform float spot_light1_intensity;
 
     // Difusse
     uniform bool show_lambert_model;
     uniform bool show_disney_model;
-    uniform bool show_orennayar_model;
+    //uniform bool show_orennayar_model;
 
     // Specular
     uniform bool show_blinnphong_model;
@@ -235,7 +236,16 @@ const char *pixelShader = R"(
 
         //Point Light 1
         vec3 lightPoint1Color = vec3(1, 1, 1);  
-        float LightPoint1Intensity = 3.0; 
+        float LightPoint1Intensity; 
+
+        if (enable_spot_light1)
+        {
+            LightPoint1Intensity = spot_light1_intensity;
+        }
+        else
+        {
+            LightPoint1Intensity = 0.0;
+        }
 
         //Dots + Half Vector - Point Light1
         vec3 R1 = reflect(L1, N);
@@ -293,7 +303,7 @@ const char *pixelShader = R"(
         //float intensity = clamp(d+pow(s, 50), 0, 1);
        
         // TODO
-        if (show_orennayar_model) {};
+        //if (show_orennayar_model) {};
         
         if (show_lambert_model && show_blinnphong_model)
         {
@@ -951,7 +961,7 @@ int main(int ac, char **av) {
     bool show_settings_window = true;
     bool show_lambert_model = false;
     bool show_disney_model = false;
-    bool show_orennayar_model = false;
+    //bool show_orennayar_model = false;
     bool show_blinnphong_model = false;
     bool show_cooktorrance_model = false;
     bool show_extras = true;
@@ -995,11 +1005,11 @@ int main(int ac, char **av) {
         else
             SetUniform(shader, "show_disney_model", 0);
 
-        // Show the Oren Nayar Model
-        if (show_orennayar_model)
+        // TODO: Show the Oren Nayar Model
+        /*if (show_orennayar_model)
             SetUniform(shader, "show_orennayar_model", 1);
         else
-            SetUniform(shader, "show_orennayar_model", 0);
+            SetUniform(shader, "show_orennayar_model", 0);*/
 
         // Show the Blinn Phong Model
         if (show_blinnphong_model)
@@ -1020,32 +1030,21 @@ int main(int ac, char **av) {
             ImGui::Begin("BRDF Models", nullptr, ImGuiWindowFlags_NoResize);
             ImGui::SetWindowSize(ImVec2(260, 390));
             ImGui::SetWindowPos(ImVec2(0, 0));
-            //ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize;
 
+            // For troubleshooting purposes
             //ImVec2 winsize = ImGui::GetWindowSize();
 
-            // Display some text (you can use a format strings too)
             //ImGui::Text("Select a Model:");
             // Checkboxes
             ImGui::SetWindowFontScale(1.3);
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Difusse");
-            //ImGui::Text("Difusse: ");
-            
-            // checkboxes work, but can select multiple
-            /*ImGui::SetWindowFontScale(1.1);
-            ImGui::Checkbox("Demo Window", &show_demo_window);      
-            ImGui::Checkbox("Lambert", &show_lambert_model);          
-            ImGui::Checkbox("Disney", &show_disney_model);
-            ImGui::Checkbox("Oren Nayar", &show_orennayar_model);*/
-            // End of checkboxes
 
-            // Trying with radio buttons
+            // Radio buttons
             ImGui::SetWindowFontScale(1.1);
             static int e = -1;
             ImGui::RadioButton("Lambert   ", &e, 0);
             ImGui::RadioButton("Disney    ", &e, 1); //ImGui::SameLine();
-            ImGui::RadioButton("Oren Nayar ", &e, 2);
-            static int i1 = 0;
+            //ImGui::RadioButton("Oren Nayar ", &e, 2);
 
             if (e == 0)
             {
@@ -1054,15 +1053,15 @@ int main(int ac, char **av) {
             else if (e == 1)
             {
                 SetUniform(shader, "show_disney_model", 1);
-                ImGui::SliderInt("Roughfness", &i1, 1, 3);
+                //ImGui::SliderInt("Roughfness", &i1, 1, 3);
                 ImGui::SetWindowSize(ImVec2(270, 420));
             }
-            else if (e == 2)
-            {
-                SetUniform(shader, "show_orennayar_model", 1);
-                ImGui::SliderInt("Roughfness", &i1, 1, 3);
-                ImGui::SetWindowSize(ImVec2(270, 420));
-            }
+            //else if (e == 2)
+            //{
+            //    SetUniform(shader, "show_orennayar_model", 1);
+            //    //ImGui::SliderInt("Roughfness", &i1, 1, 3);
+            //    ImGui::SetWindowSize(ImVec2(270, 420));
+            //}
             // End of Testing radio buttons
             
             // Specular
@@ -1084,16 +1083,18 @@ int main(int ac, char **av) {
                 SetUniform(shader, "show_cooktorrance_model", 1);
             }
 
+            static float f = 0.0f;
             ImGui::SetWindowFontScale(1.3);
             //ImGui::NewLine();
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Spot Light");
             ImGui::SetWindowFontScale(1.1);
             ImGui::Checkbox("Use Spot Light1", &enable_spot_light1);
-           
+            
             if (enable_spot_light1)
-            {
-               
+            {              
                 SetUniform(shader, "enable_spot_light1", 1);
+                ImGui::SliderFloat("Intensity", &f, 1.0, 10.0, "%3.2f");
+                SetUniform(shader, "spot_light1_intensity", f);
             }
             else
             {
@@ -1107,48 +1108,16 @@ int main(int ac, char **av) {
                 ImGui::SetWindowSize(ImVec2(260, 390));
                 show_lambert_model = false;
                 show_disney_model = false;
-                show_orennayar_model = false;
+                //show_orennayar_model = false;
                 show_blinnphong_model = false;
                 show_cooktorrance_model = false;
                 enable_spot_light1 = false;
                 e = -1;
                 e1 = -1;
             }
-            
-            // Checkboxes for specular
-            //ImGui::Checkbox("Blinn Phong", &show_blinnphong_model);
-            //ImGui::Checkbox("Cook Torrance", &show_cooktorrance_model);
-            // End of checkboxes for specular
-            
-            // Could we use a slider in the future to manipulate
-            // Intensity?
-            //ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            
-
+                      
             // Display FPS
             //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-            /*if (ImGui::TreeNode("Difusse Test"))
-            {
-                static bool selection[3] = { true, false, false };
-                ImGui::Selectable("1. Lambert", &selection[0]);
-                ImGui::Selectable("2. Disney", &selection[1]);
-                ImGui::Selectable("3. Oren Nayar", &selection[2]);
-                ImGui::TreePop();
-            }*/
-
-            // Testing drop down menu
-            /*if (ImGui::TreeNode("Difusse Dropdown menu:"))
-            {
-                static int selected = -1;
-                for (int n = 0; n < 5; n++)
-                {
-                    char buf[32];
-                    sprintf(buf, "Object %d", n);
-                    if (ImGui::Selectable(buf, selected == n))
-                        selected = n;
-                }
-                ImGui::TreePop();
-            }*/
 
             if (show_extras)
             {
