@@ -124,6 +124,7 @@ const char *pixelShader = R"(
     // Spot Lights
     uniform bool enable_spot_light1;
     uniform float spot_light1_intensity;
+    uniform vec3 spot_light1_color;
 
     // Difusse
     uniform bool show_lambert_model;
@@ -235,16 +236,20 @@ const char *pixelShader = R"(
         float LoH = max(dot(L, H),0.0);
 
         //Point Light 1
-        vec3 lightPoint1Color = vec3(1, 1, 1);  
+        //vec3 lightPoint1Color = vec3(1, 1, 1); 
+        vec3 lightPoint1Color;
+ 
         float LightPoint1Intensity; 
 
         if (enable_spot_light1)
         {
-            LightPoint1Intensity = spot_light1_intensity;
+            lightPoint1Color = vec3(spot_light1_color.x, spot_light1_color.y, spot_light1_color.z);   
+            LightPoint1Intensity = spot_light1_intensity;     
         }
         else
         {
-            LightPoint1Intensity = 0.0;
+            lightPoint1Color = vec3(1, 1, 1);
+            LightPoint1Intensity = 0.0;      
         }
 
         //Dots + Half Vector - Point Light1
@@ -849,6 +854,21 @@ void Keyboard(GLFWwindow *w, int c, int scancode, int action, int mods) {
         }
 }
 
+// Helper to display a little (?) mark which shows a tooltip when hovered.
+// In your own code you may want to display an actual icon if you are using a merged icon fonts (see docs/FONTS.txt)
+static void HelpMarker(const char* desc)
+{
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(desc);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+}
+
 int main(int ac, char **av) { 
     
     // Setup window
@@ -957,7 +977,7 @@ int main(int ac, char **av) {
     glfwSetWindowSizeCallback(w, Resize);
 
     /* ImGUI Stuff*/
-    bool show_demo_window = false;
+    bool show_demo_window = true;
     bool show_settings_window = true;
     bool show_lambert_model = false;
     bool show_disney_model = false;
@@ -1089,12 +1109,18 @@ int main(int ac, char **av) {
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Spot Light");
             ImGui::SetWindowFontScale(1.1);
             ImGui::Checkbox("Use Spot Light1", &enable_spot_light1);
-            
+            // Light color picker test
+            static ImVec4 color = ImVec4(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f);
             if (enable_spot_light1)
             {              
                 SetUniform(shader, "enable_spot_light1", 1);
                 ImGui::SliderFloat("Intensity", &f, 1.0, 10.0, "%3.2f");
                 SetUniform(shader, "spot_light1_intensity", f);
+                // Light color picker test
+                ImGui::SameLine(); HelpMarker(
+                    "Click on the colored square to open a color picker.\n");
+                ImGui::ColorEdit3("Light Color", (float*)&color, ImGuiColorEditFlags_NoOptions);
+                SetUniform3(shader, "spot_light1_color", (float*)&color);
             }
             else
             {
