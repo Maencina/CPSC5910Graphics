@@ -977,7 +977,7 @@ int main(int ac, char **av) {
     glfwSetWindowSizeCallback(w, Resize);
 
     /* ImGUI Stuff*/
-    bool show_demo_window = true;
+    bool show_demo_window = false;
     bool show_settings_window = true;
     bool show_lambert_model = false;
     bool show_disney_model = false;
@@ -1112,7 +1112,8 @@ int main(int ac, char **av) {
             // Light color picker test
             static ImVec4 color = ImVec4(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f);
             if (enable_spot_light1)
-            {              
+            {  
+                ImGui::SetWindowSize(ImVec2(280, 430));
                 SetUniform(shader, "enable_spot_light1", 1);
                 ImGui::SliderFloat("Intensity", &f, 1.0, 10.0, "%3.2f");
                 SetUniform(shader, "spot_light1_intensity", f);
@@ -1140,6 +1141,8 @@ int main(int ac, char **av) {
                 enable_spot_light1 = false;
                 e = -1;
                 e1 = -1;
+                color.x = 1.0, color.y = 1.0, color.z = 1.0;
+                f = 1.0;
             }
                       
             // Display FPS
