@@ -166,11 +166,7 @@ const char *pixelShader = R"(
      }
 
     // Bump mapping
-    /*vec3 BumpNormal() {
-        vec4 bumpV = texture(bumpMap, uv);
-        vec3 bv = vec3(2*bumpV.r-1, 2*bumpV.g-1, bumpV.b);
-        return normalize(bv);
-    }
+    
     
     vec3 TransformToLocal(vec3 b, vec3 u, vec3 v, vec3 n) {
         float xx = b.x*u.x + b.y*v.x + b.z*n.x;
@@ -179,14 +175,7 @@ const char *pixelShader = R"(
         return normalize(vec3(xx, yy, zz));
     }
 
-    vec2 du = dFdy(teUv), dv = dFdx(teUv);
-    vec3 dx = dFdy(tePoint), dy = dFdx(tePoint);
-    vec3 U = normalize(du.x * dx + du.y * dy);
-    vec3 V = normalize(dv.x * dx + dv.y * dy);
-    vec3 N = normalize(teNormal);
-    vec3 B = BumpNormal();
-    vec3 XN = TransformToLocal(B, U, V, N);
-    vec3 n = normalize(XN);*/
+    
 
 
     void main() {
@@ -211,6 +200,20 @@ const char *pixelShader = R"(
         vec3 metallicTexture = texture(Metallic_Map, vec2(vUv.x,vUv.y)).rgb;
         vec3 roughnessTexture = texture(Roughness_Map, vec2(vUv.x,vUv.y)).rgb;
         
+        //Normal map
+        vec2 du = dFdy(vUv), dv = dFdx(vUv);
+        vec3 dx = dFdy(vPoint), dy = dFdx(vPoint);
+        vec3 U = normalize(du.x * dx + du.y * dy);
+        vec3 V = normalize(dv.x * dx + dv.y * dy);
+        vec3 NormalMap = normalize(vNormal);
+        vec4 bumpV = texture(Normal_Map, vec2(vUv.x,vUv.y));
+        vec3 bv = vec3(2*bumpV.r-1, 2*bumpV.g-1, bumpV.b);
+        vec3 B = normalize(bv);
+        vec3 XN = TransformToLocal(B, U, V, NormalMap);
+        vec3 n = normalize(XN);
+        
+        
+
         //Constants
         float PI = 3.1415;
     
@@ -220,6 +223,7 @@ const char *pixelShader = R"(
         vec3 L1 = normalize(light2-vPoint);  // light vector2
         vec3 E = normalize(vPoint);        // eye vector
         
+        N = n;
         
         //Directional Light
         vec3 lightDir = vec3(0.0, 0.0, 1.0);
