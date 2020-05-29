@@ -39,7 +39,7 @@ CameraAB    camera(0, 0, winW, winH, vec3(0,0,0), vec3(0,0,-5));
 // interaction
 int         xCursorOffset = 0, yCursorOffset = 0;
 vec3        light(-.2f, .4f, .3f);
-vec3        light2(-.3f, .3f, .1f);
+vec3        light2(.2f, .4f, .3f);
 
 Framer      framer;     // to position/orient individual mesh
 Mover       mover;      // to position light
@@ -211,9 +211,7 @@ const char *pixelShader = R"(
         vec3 B = normalize(bv);
         vec3 XN = TransformToLocal(B, U, V, NormalMap);
         vec3 n = normalize(XN);
-        
-        
-
+                
         //Constants
         float PI = 3.1415;
     
@@ -396,29 +394,56 @@ const char *pixelShader = R"(
         {
             specular = Blinn * lightDirColor;
             specular1 = Blinn1 * lightPoint1Color;
-
-            pColor = vec4(specular + specular1, 1);
+            if (enable_spot_light1)
+            {
+                pColor = vec4(specular + specular1, 1);
+            }
+            else
+            {
+                pColor = vec4(specular , 1);
+            }
         }
         else if (show_cooktorrance_model)
         {
             vec3 specular = CookTorrance * lightDirColor;
             vec3 specular1 = CookTorrance1 * lightPoint1Color;
 
-            pColor = vec4(specular + specular1, 1);
+            if (enable_spot_light1)
+            {
+                pColor = vec4(specular + specular1, 1);
+            }
+            else
+            {
+                pColor = vec4(specular , 1);
+            }
         }
         else if (show_lambert_model)
         {
            diffuse = vec3(LightDirIntensity * albedo.rgb * Lambert * lightDirColor); 
            diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Lambert * lightPoint1Color);
 
-            pColor = vec4(diffuse + diffuse1, 1);
+            if (enable_spot_light1)
+            {
+                pColor = vec4(diffuse + diffuse1, 1);
+            }
+            else
+            {
+                pColor = vec4(diffuse, 1);
+            }
         }
         else if (show_disney_model)
         {
            diffuse = vec3(LightDirIntensity * albedo.rgb * Disney * lightDirColor); 
            diffuse1 = vec3(LightPoint1Intensity * albedo.rgb * Disney1 * lightPoint1Color);
 
-            pColor = vec4(diffuse + diffuse1, 1);
+             if (enable_spot_light1)
+            {
+                pColor = vec4(diffuse + diffuse1, 1);
+            }
+            else
+            {
+                pColor = vec4(diffuse, 1);
+            }
         }
         else
         {
