@@ -38,7 +38,7 @@ CameraAB    camera(0, 0, winW, winH, vec3(0,0,0), vec3(0,0,-5));
 
 // interaction
 int         xCursorOffset = 0, yCursorOffset = 0;
-vec3        light(-.2f, .4f, .3f);
+//vec3        light(-.2f, .4f, .3f);
 vec3        light2(.2f, .4f, .3f);
 
 Framer      framer;     // to position/orient individual mesh
@@ -86,12 +86,33 @@ const char *vertexShader = R"(
     uniform mat4 persp;
     uniform float current_time;
     uniform bool move_guitar_updown;
+    uniform bool move_guitar_xyaxis;
+    uniform bool move_guitar_xzaxis;
+    
+
     void main() {
         vPoint = (modelview*vec4(point, 1)).xyz;
+        
+        // Move the guitar up/down
         if (move_guitar_updown)
         {        
-            vPoint.y += 0.2*sin(current_time);
+            vPoint.y += 0.2*sin(current_time);  
         }
+
+        // Move the guitar xy axis
+        if (move_guitar_xyaxis)
+        {
+            vPoint = vec3(vPoint.x * cos(current_time) - vPoint.y * sin(current_time), 
+                        vPoint.y * cos(current_time) + vPoint.x * sin(current_time), vPoint.z);
+        }
+
+        // Move the guitar xz axis
+        if (move_guitar_xzaxis)
+        {
+            vPoint = vec3(vPoint.x * cos(current_time) - vPoint.z * sin(current_time), 
+                        vPoint.y, vPoint.z * cos(current_time) + vPoint.x * sin(current_time));
+        }
+
         vNormal = (modelview*vec4(normal, 0)).xyz;
         gl_Position = persp*vec4(vPoint, 1);
         vUv = uv;
@@ -104,7 +125,7 @@ const char *pixelShader = R"(
     in vec3 vNormal;
     in vec2 vUv;
     out vec4 pColor;
-    uniform vec3 light;
+    //uniform vec3 light;
     uniform vec3 light2;
     //uniform vec3 lightDir;
     uniform sampler2D Albedo_Map;
@@ -114,6 +135,9 @@ const char *pixelShader = R"(
     uniform sampler2D Roughness_Map;
     uniform mat4 modelview;
     uniform bool use_albedo_body;
+    uniform bool show_normal_map;
+    uniform bool show_ao_map;
+
     // Bump mapping
     /*uniform sampler2D bumpMap;
     in vec2 uv;
@@ -217,15 +241,17 @@ const char *pixelShader = R"(
     
         //Information from the Vertex Shader
         vec3 N = normalize(vNormal);       // surface normal
-        vec3 L = normalize(light-vPoint);  // light vector
+        //vec3 L = normalize(light-vPoint);  // light vector
         vec3 L1 = normalize(light2-vPoint);  // light vector2
         vec3 E = normalize(vPoint);        // eye vector
         
-        N = n;
+        // This is for demo purposes.
+        if (show_normal_map)
+           N = n;
         
         //Directional Light
         vec3 lightDir = vec3(0.0, 0.0, 1.0);
-        L = lightDir; 
+        vec3 L = lightDir; 
         vec3 lightDirColor = vec3(1, 1, 1);  
         float LightDirIntensity = 4.0;     
 
@@ -325,12 +351,26 @@ const char *pixelShader = R"(
             
             if (enable_spot_light1)
             {
-                pColor = vec4(direct + direct1, 1);
+                if (show_ao_map)
+                {
+                    pColor = vec4(direct + direct1, 1) * vec4(AOTexture,1);
+                }
+                else
+                {
+                    pColor = vec4(direct + direct1, 1);
+                }                
             }
             else
             {
-                pColor = vec4(direct, 1);
-            }
+                if (show_ao_map)
+                {
+                    pColor = vec4(direct, 1) * vec4(AOTexture,1);
+                }
+                else
+                {
+                    pColor = vec4(direct, 1);
+                }  
+            }   
         }
         else if (show_disney_model && show_blinnphong_model)
         {
@@ -345,11 +385,26 @@ const char *pixelShader = R"(
 
             if (enable_spot_light1)
             {
-                pColor = vec4(direct + direct1, 1);
+                if (show_ao_map)
+                {
+                    pColor = vec4(direct + direct1, 1) * vec4(AOTexture,1);
+                }
+                else
+                {
+                    pColor = vec4(direct + direct1, 1);
+                }
             }
             else
             {
-                pColor = vec4(direct, 1);
+                if (show_ao_map)
+                {
+                    pColor = vec4(direct, 1) * vec4(AOTexture,1);
+                }
+                else
+                {
+                    pColor = vec4(direct, 1);
+                }
+                
             }
         }
         else if (show_lambert_model && show_cooktorrance_model)
@@ -364,11 +419,26 @@ const char *pixelShader = R"(
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
              if (enable_spot_light1)
             {
-                pColor = vec4(direct + direct1, 1);
+                if (show_ao_map)
+                {
+                    pColor = vec4(direct + direct1, 1) * vec4(AOTexture,1);
+                }
+                else
+                {
+                    pColor = vec4(direct + direct1, 1);
+                }
+                
             }
             else
             {
-                pColor = vec4(direct, 1);
+                if (show_ao_map)
+                {
+                    pColor = vec4(direct, 1) * vec4(AOTexture,1);
+                }
+                else
+                {
+                    pColor = vec4(direct, 1);
+                }
             }
         }
         else if (show_disney_model && show_cooktorrance_model)
@@ -383,11 +453,25 @@ const char *pixelShader = R"(
             vec3 direct1 = (diffuse1 + specular1) * NoL1;
             if (enable_spot_light1)
             {
-                pColor = vec4(direct + direct1, 1);
+                if (show_ao_map)
+                {
+                    pColor = vec4(direct + direct1, 1) * vec4(AOTexture,1);
+                }
+                else
+                {
+                    pColor = vec4(direct + direct1, 1);
+                }
             }
             else
             {
-                pColor = vec4(direct, 1);
+                if (show_ao_map)
+                {
+                    pColor = vec4(direct, 1) * vec4(AOTexture,1);
+                }
+                else
+                {
+                    pColor = vec4(direct, 1);
+                }   
             }
         }
         else if (show_blinnphong_model)
@@ -720,8 +804,8 @@ void Display() {
     glEnable(GL_LINE_SMOOTH);
     glUseProgram(shader);
     // update light
-    vec4 xlight = camera.modelview*vec4(light, 1);
-    SetUniform3(shader, "light", (float *) &xlight.x);
+    /*vec4 xlight = camera.modelview*vec4(light, 1);
+    SetUniform3(shader, "light", (float *) &xlight.x);*/
 
     // Testing
     vec4 xlight2 = camera.modelview * vec4(light2, 1);
@@ -735,7 +819,7 @@ void Display() {
     if ((clock()-mouseMoved)/CLOCKS_PER_SEC < 1.f) {
         glDisable(GL_DEPTH_TEST);
         UseDrawShader(camera.fullview);
-        Disk(light, 9, vec3(1,1,0));
+        //Disk(light, 9, vec3(1,1,0));
         
         // Change the color of the dot to green
         Disk(light2, 9, vec3(0, 1, 0));
@@ -782,7 +866,7 @@ bool isMouseInMenu(int x, int y)
     //ImVec2 winSize = ImGui::GetWindowSize();
     //ImVec2 winPos = ImGui::GetWindowPos();
 
-    if (x <= 270 && y <= 420)
+    if (x <= 300 && y <= 480)
         return true;
     else
         return false;
@@ -800,10 +884,10 @@ void MouseButton(GLFWwindow *w, int butn, int action, int mods) {
 
     if (action == GLFW_PRESS && butn == GLFW_MOUSE_BUTTON_LEFT) {
         void *newPicked = NULL;
-        if (MouseOver(x, y, light, camera.fullview)) {
+       /* if (MouseOver(x, y, light, camera.fullview)) {
             newPicked = &mover;
             mover.Down(&light, x, y, camera.modelview, camera.persp);
-        }
+        }*/
         if (MouseOver(x, y, light2, camera.fullview)) {
             newPicked = &mover;
             mover.Down(&light2, x, y, camera.modelview, camera.persp);
@@ -1015,8 +1099,13 @@ int main(int ac, char **av) {
     bool show_cooktorrance_model = false;
     bool show_extras = true;
     bool move_guitar_updown = false;
+    bool move_guitar_xyaxis = false;
+    bool move_guitar_xzaxis = false;
+    
     //bool spot_light1 = false;
     bool enable_spot_light1 = false;
+    bool show_normal_map = false;
+    bool show_ao_map = false;
     //time_t current_time;
     
     //ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -1077,7 +1166,7 @@ int main(int ac, char **av) {
             //static float f = 0.0f;
             // Create a window called "BRDF Models" and append into it.
             ImGui::Begin("BRDF Models", nullptr, ImGuiWindowFlags_NoResize);
-            ImGui::SetWindowSize(ImVec2(260, 390));
+            ImGui::SetWindowSize(ImVec2(280, 480));
             ImGui::SetWindowPos(ImVec2(0, 0));
 
             // For troubleshooting purposes
@@ -1086,7 +1175,7 @@ int main(int ac, char **av) {
             //ImGui::Text("Select a Model:");
             // Checkboxes
             ImGui::SetWindowFontScale(1.3);
-            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Difusse");
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Diffuse");
 
             // Radio buttons
             ImGui::SetWindowFontScale(1.1);
@@ -1103,7 +1192,7 @@ int main(int ac, char **av) {
             {
                 SetUniform(shader, "show_disney_model", 1);
                 //ImGui::SliderInt("Roughfness", &i1, 1, 3);
-                ImGui::SetWindowSize(ImVec2(270, 420));
+                //ImGui::SetWindowSize(ImVec2(270, 420));
             }
             //else if (e == 2)
             //{
@@ -1142,7 +1231,7 @@ int main(int ac, char **av) {
             static ImVec4 color = ImVec4(255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f, 255.0f / 255.0f);
             if (enable_spot_light1)
             {  
-                ImGui::SetWindowSize(ImVec2(280, 430));
+                ImGui::SetWindowSize(ImVec2(300, 520));
                 SetUniform(shader, "enable_spot_light1", 1);
                 ImGui::SliderFloat("Intensity", &f, 1.0, 10.0, "%3.2f");
                 SetUniform(shader, "spot_light1_intensity", f);
@@ -1157,11 +1246,34 @@ int main(int ac, char **av) {
                 SetUniform(shader, "enable_spot_light1", 0);
             }
 
+            // Enable disable the normal map
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Maps:");
+            ImGui::Checkbox("Normal Map", &show_normal_map);
+            if (show_normal_map)
+            {
+                SetUniform(shader, "show_normal_map", 1);
+            }
+            else
+            {
+                SetUniform(shader, "show_normal_map", 0);
+            }
+
+            // Enable disable the Ambient Occlusion (AO) map
+            ImGui::Checkbox("AO Map", &show_ao_map);
+            if (show_ao_map)
+            {
+                SetUniform(shader, "show_ao_map", 1);
+            }
+            else
+            {
+                SetUniform(shader, "show_ao_map", 0);
+            }
+
             ImGui::NewLine();
             ImGui::SetWindowFontScale(1.5);
             if (ImGui::Button("  Reset  "))
             {
-                ImGui::SetWindowSize(ImVec2(260, 390));
+                ImGui::SetWindowSize(ImVec2(280, 480));
                 show_lambert_model = false;
                 show_disney_model = false;
                 //show_orennayar_model = false;
@@ -1180,7 +1292,8 @@ int main(int ac, char **av) {
             if (show_extras)
             {
                 ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Extras:");
-                ImGui::Checkbox("Move Guitar", &move_guitar_updown);
+                ImGui::SetWindowFontScale(1.1);
+                ImGui::Checkbox("Move Guitar Up/Down", &move_guitar_updown);
                 if (move_guitar_updown)
                 {
                     SetUniform(shader, "move_guitar_updown", 1);
@@ -1188,6 +1301,26 @@ int main(int ac, char **av) {
                 else
                 {
                     SetUniform(shader, "move_guitar_updown", 0);
+                }
+                // Move guitar x, y axis
+                ImGui::Checkbox("Move Guitar xy axis", &move_guitar_xyaxis);
+                if (move_guitar_xyaxis)
+                {
+                    SetUniform(shader, "move_guitar_xyaxis", 1);
+                }
+                else
+                {
+                    SetUniform(shader, "move_guitar_xyaxis", 0);
+                }
+                // Move guitar x, y axis
+                ImGui::Checkbox("Move Guitar xz axis", &move_guitar_xzaxis);
+                if (move_guitar_xzaxis)
+                {
+                    SetUniform(shader, "move_guitar_xzaxis", 1);
+                }
+                else
+                {
+                    SetUniform(shader, "move_guitar_xzaxis", 0);
                 }
             }
 
