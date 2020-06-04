@@ -21,15 +21,15 @@ void GetViewportSize(int &width, int &height) {
 
 mat4 Viewport() {
     // map +/-1 space to screen space viewport
-    int vp[4];
-    glGetIntegerv(GL_VIEWPORT, vp);
+    float vp[4];
+    glGetFloatv(GL_VIEWPORT, vp);
     float x = vp[0], y = vp[1], w = vp[2], h = vp[3];
     return mat4(vec4(w/2,0,0,x+w/2), vec4(0,h/2,0,y+h/2), vec4(0,0,1,0), vec4(0,0,0,1));
 }
 
 mat4 ScreenMode() {
-    int vp[4];
-    glGetIntegerv(GL_VIEWPORT, vp);
+    float vp[4];
+    glGetFloatv(GL_VIEWPORT, vp);
     mat4 scale = Scale(2.f/(float)vp[2], 2.f/(float)vp[3], 1);
     mat4 tran = Translate(vp[0]-1, vp[1]-1, 0);
     return tran*scale;
@@ -72,8 +72,8 @@ float ScreenDistSq(int x, int y, vec3 p, mat4 m, float *zscreen) {
 
 float ScreenDistSq(double x, double y, vec3 p, mat4 m, float *zscreen) {
     vec2 screen = ScreenPoint(p, m, zscreen);
-    float dx = x-screen.x, dy = y-screen.y;
-    return dx*dx+dy*dy;
+    double dx = x-screen.x, dy = y-screen.y;
+    return static_cast<float>(dx*dx+dy*dy);
 }
 
 void ScreenRay(float xscreen, float yscreen, mat4 modelview, mat4 persp, vec3 &p, vec3 &v) {
@@ -116,8 +116,8 @@ void ScreenLine(float xscreen, float yscreen, mat4 modelview, mat4 persp, vec3 &
         printf("UnProject false\n");
         // alternatively, a seond point can be determined by transforming the origin by the inverse of modelview
         // this would yield in world space the camera location, through which all view lines pass
-    p1 = vec3(a[0], a[1], a[2]);
-    p2 = vec3(b[0], b[1], b[2]);
+    p1 = vec3(static_cast<float>(a[0]), static_cast<float>(a[1]), static_cast<float>(a[2]));
+    p2 = vec3(static_cast<float>(b[0]), static_cast<float>(b[1]), static_cast<float>(b[2]));
 }
 
 // Draw Shader
@@ -206,14 +206,14 @@ void Disk(vec3 p, float diameter, vec3 color, float opacity) {
     VertexAttribPointer(drawShader, "color", 3, 0, (void *) sizeof(vec3));
     // draw
     SetUniform(drawShader, "opacity", opacity);
-//  SetUniform(drawShader, "fadeToCenter", 1); // needed if GL_POINT_SMOOTH and GL_POINT_SPRITE fail
     glPointSize(diameter);
 #if defined(GL_POINT_SMOOTH)
     glEnable(GL_POINT_SMOOTH);
-#endif
-#if !defined(GL_POINT_SMOOTH) && defined(GL_POINT_SPRITE)
+#elseif defined(GL_POINT_SPRITE)
     glEnable(GL_POINT_SPRITE);
+#else
     glEnable(0x8861); // same as GL_POINT_SMOOTH [this is a 4.5 core bug]
+    SetUniform(drawShader, "fadeToCenter", 1); // needed if GL_POINT_SMOOTH and GL_POINT_SPRITE fail
 #endif
     glDrawArrays(GL_POINTS, 0, 1);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -257,6 +257,11 @@ void Line(vec2 p1, vec2 p2, float width, vec3 col, float opacity) {
     Line(p1, p2, width, col, col, opacity);
 }
 
+void Line(int x1, int y1, int x2, int y2, float width, vec3 col, float opacity) {
+    vec3 p1((float) x1, (float) y1, 0), p2((float) x2, (float) y2, 0);
+    Line(p1, p2, width, col, col, opacity);
+}
+
 GLuint lineStripBuffer = 0;
 
 void LineStrip(int nPoints, vec3 *points, vec3 &color, float opacity, float width) {
@@ -281,6 +286,10 @@ void LineStrip(int nPoints, vec3 *points, vec3 &color, float opacity, float widt
 GLuint quadBuffer = 0;
 
 void Quad(vec3 p1, vec3 p2, vec3 p3, vec3 p4, bool solid, vec3 col, float opacity, float lineWidth) {
+#ifndef GL_QUADS
+	Triangle(p1, p2, p3, col, col, col, opacity, !solid, col, lineWidth);
+	Triangle(p1, p3, p4, col, col, col, opacity, !solid, col, lineWidth);
+#else
     vec3 data[] = { p1, p2, p3, p4, col, col, col, col };
     UseDrawShader();
     if (quadBuffer == 0) {
@@ -296,6 +305,7 @@ void Quad(vec3 p1, vec3 p2, vec3 p3, vec3 p4, bool solid, vec3 col, float opacit
     SetUniform(drawShader, "fadeToCenter", 0);
     glLineWidth(lineWidth);
     glDrawArrays(solid? GL_QUADS : GL_LINE_LOOP, 0, 4);
+#endif
 }
 
 // Arrows
@@ -337,6 +347,76 @@ void ArrowV(vec3 base, vec3 v, mat4 modelview, mat4 persp, vec3 col, float lineW
     Line(base, head, lineWidth, col);
     PointScreen(head, h1, modelview, persp, lineWidth, col);
     PointScreen(head, h2, modelview, persp, lineWidth, col);
+}
+
+// Cylinders
+
+GLuint cylinderShader = 0;
+
+void Cylinder(vec3 p1, vec3 p2, float r1, float r2, mat4 modelview, mat4 persp, vec4 color) {
+	const char *vShader = "void main() { gl_Position = vec4(0); }";
+	const char *teShader = R"(
+		#version 400 core
+		layout (quads, equal_spacing, ccw) in;
+		uniform vec3 p1;
+		uniform vec3 p2;
+		uniform float r1;
+		uniform float r2;
+		uniform mat4 modelview;
+		uniform mat4 persp;
+		out vec3 tePoint;
+		out vec3 teNormal;
+		void main() {
+			vec2 uv = gl_TessCoord.st;
+			float c = cos(2*3.1415*uv.s), s = sin(2*3.1415*uv.s);
+			vec3 dp = p2-p1;
+			vec3 crosser = dp.x < dp.y? (dp.x < dp.z? vec3(1,0,0) : vec3(0,0,1)) : (dp.y < dp.z? vec3(0,1,0) : vec3(0,0,1));
+			vec3 xcross = normalize(cross(crosser, dp));
+			vec3 ycross = normalize(cross(xcross, dp));
+			vec3 n = c*xcross+s*ycross;
+			vec3 p = mix(p1, p2, uv.t)+mix(r1, r2, uv.t)*n;
+			tePoint = (modelview*vec4(p, 1)).xyz;
+			teNormal = (modelview*vec4(n, 0)).xyz;
+			gl_Position = persp*vec4(tePoint, 1);
+		}
+	)";
+	const char *pShader = R"(
+		#version 130
+		in vec3 tePoint;
+		in vec3 teNormal;
+		out vec4 pColor;
+		uniform vec4 color;
+		uniform vec3 light;
+		void main() {
+			vec3 N = normalize(teNormal);      // surface normal
+			vec3 L = normalize(light-tePoint); // light vector
+			vec3 E = normalize(tePoint);       // eye vector
+			vec3 R = reflect(L, N);            // highlight vector
+			float d = abs(dot(N, L));          // two-sided diffuse
+			float s = abs(dot(R, E));          // two-sided specular
+			float intensity = clamp(d+pow(s, 50), 0, 1);
+			pColor = intensity*color;
+		}
+	)";
+	if (!cylinderShader)
+		cylinderShader = LinkProgramViaCode(&vShader, NULL, &teShader, NULL, &pShader);
+	glUseProgram(cylinderShader);
+	SetUniform(cylinderShader, "modelview", modelview);
+	SetUniform(cylinderShader, "persp", persp);
+	SetUniform(cylinderShader, "color", color);
+	SetUniform(cylinderShader, "p1", p1);
+	SetUniform(cylinderShader, "p2", p2);
+	SetUniform(cylinderShader, "r1", r1);
+	SetUniform(cylinderShader, "r2", r2);
+	//float r = 24, outerLevels[] = {1, r, 1, r}, innerLevels[] = {r, r};
+    float r = 24;
+    const GLfloat outerLevels[4] = { 1, r, 1, r };
+    const GLfloat innerLevels[] = { r, r };
+
+    //glPatchParameteri(GL_PATCH_VERTICES, 4);
+    //glPatchParameterfv(GL_PATCH_DEFAULT_OUTER_LEVEL, outerLevels);
+    //glPatchParameterfv(GL_PATCH_DEFAULT_INNER_LEVEL, innerLevels);
+	glDrawArrays(GL_PATCHES, 0, 4);
 }
 
 // Triangles with optional outline

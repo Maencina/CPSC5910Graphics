@@ -2,7 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="Lib\CameraArcball.cpp" />
-    <ClCompile Include="Lib\Draw.cpp" />
     <ClCompile Include="Lib\glad.c" />
     <ClCompile Include="Lib\GLXtras.cpp" />
     <ClCompile Include="Lib\Mesh.cpp" />
@@ -31,6 +30,7 @@
       <Filter>gl3w</Filter>
     </ClCompile>
     <ClCompile Include="15-Solution-MultiMeshCopy-ImGui.cpp" />
+    <ClCompile Include="Lib\Draw.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="imgui">

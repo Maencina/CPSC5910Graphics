@@ -11,7 +11,7 @@
 #include "Misc.h"
 #include "Widgets.h"
 #include <stdio.h>
-#include "Draw.h"
+#include <Draw.h>
 #include "Quaternion.h"
 #include "GL/glut.h"
 #include "imgui.h"
@@ -40,6 +40,7 @@ CameraAB    camera(0, 0, winW, winH, vec3(0,0,0), vec3(0,0,-5));
 int         xCursorOffset = 0, yCursorOffset = 0;
 //vec3        light(-.2f, .4f, .3f);
 vec3        light2(.2f, .4f, .3f);
+vec3		lightAt = light2 + vec3(.5f, 0, 0);
 
 Framer      framer;     // to position/orient individual mesh
 Mover       mover;      // to position light
@@ -823,6 +824,11 @@ void Display() {
         
         // Change the color of the dot to green
         Disk(light2, 9, vec3(0, 1, 0));
+        // Implement the cylinder
+        Disk(lightAt, 9, vec3(1, 0, 0));
+        vec3 endArrow = .5f * normalize(lightAt - light2);
+        ArrowV(light2, endArrow, camera.modelview, camera.persp, vec3(1, 1, 0), 1, 6);
+
         for (size_t i = 0; i < meshes.size(); i++) {
             mat4 &f = meshes[i].xform;
             vec3 base(f[0][3], f[1][3], f[2][3]);
@@ -832,6 +838,9 @@ void Display() {
             framer.Draw(camera.fullview);
         if (picked == &camera)
             camera.arcball.Draw(); // camera.fullview);
+
+        //vec4 p1(light2, .5f), p2(lightAt, .1f);
+        Cylinder(light2, light2 + .5f * endArrow, 0, .3f, camera.modelview, camera.persp, vec4(1, 0, 0, .5f));
     }
 
     // Since we are using ImGui and glFlush() can be
@@ -1284,6 +1293,8 @@ int main(int ac, char **av) {
                 e1 = -1;
                 color.x = 1.0, color.y = 1.0, color.z = 1.0;
                 f = 1.0;
+                show_normal_map = false;
+                show_ao_map = false;
             }
                       
             // Display FPS
